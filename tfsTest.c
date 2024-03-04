@@ -13,7 +13,7 @@
 
 
 /* simple helper function to fill Buffer with as many inPhrase strings as possible before reaching size */
-int fillBufferWithPhrase (char *inPhrase, char *Buffer, int size) {
+int fillBufferWithPhrase(char *inPhrase, char *Buffer, int size) {
   int index = 0, i;
   if (!inPhrase || !Buffer || size <= 0 || size < strlen(inPhrase))
     return -1;
