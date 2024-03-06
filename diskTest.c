@@ -10,9 +10,10 @@
 #define BLOCKSIZE 256
 
 #define NUM_BLOCKS 50 /* total number of blocks on each disk */
-#define NUM_TEST_BLOCKS 10
+#define NUM_TEST_BLOCKS 10 
 #define TEST_BLOCKS {25, 39, 8, 9, 15, 21, 25, 33, 35, 42}
-
+// out of 50 choose only 10 - when we test change numbers
+// blocks we want to read and write to 
 
 
 int main() {
@@ -22,6 +23,7 @@ int main() {
     int retValue = 0;
     int disks[NUM_TEST_DISKS]; /* holds disk numbers being tested here */
     char diskName[] = "diskX.dsk"; /* Unix file name for the disks */
+    // disks[0] = open_disk(..., ...)
     char *buffer; /* holds one block of information */
     int testBlocks[NUM_TEST_BLOCKS] = TEST_BLOCKS; /* to contain a number of blocks to test */
 
@@ -30,20 +32,23 @@ int main() {
         buffer = malloc(BLOCKSIZE * sizeof(char));
 
         diskName[4] = '0' + index;
-        disks[index] = openDisk(diskName, 0);
+        disks[index] = openDisk(diskName, 0);  // first time, running disk does not exist
         
         if (disks[index] < 0) { 
             printf("] Open failed with (%i). Disk probably does not exist.\n", disks[index]);
 
 	        disks[index] = openDisk(diskName, BLOCKSIZE * NUM_BLOCKS); /* create the disk */
-	        if (disks[index] < 0) {
+	        if (disks[index] < 0) { 
+                // not enough space for making a new unix file
                 printf("] openDisk() failed to create a disk. This should never happen. Exiting.\n");
 		        exit(0); 
 	        }
           
-            memset(buffer, '$', BLOCKSIZE);
-            for (index2 = 0; index2 < NUM_TEST_BLOCKS; index2++) {
+            memset(buffer, '$', BLOCKSIZE); // fill our buffer with 256 dollar signs
+            for (index2 = 0; index2 < NUM_TEST_BLOCKS; index2++) { 
+                // start writting to our block 
                 retValue = writeBlock(disks[index], testBlocks[index2], buffer);
+                                        // 0, 29, buffer 
                 if (retValue < 0) {
 		            printf("] Failed to write to block %i of disk %s. Exiting (%i).\n", testBlocks[index2], diskName, retValue);
 		            exit(0);

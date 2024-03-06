@@ -1,0 +1,10 @@
+#define ERR_NOFILE -1
+#define ERR_RPASTLIMIT -2
+#define ERR_RSEEKISSUE -3
+#define ERR_RBLOCKISSUE -4
+#define ERR_READISSUE -5
+#define ERR_WPASTLIMIT -2
+#define ERR_WSEEKISSUE -3
+#define ERR_WBLOCKISSUE -4
+#define ERR_WRITEISSUE -5
+
