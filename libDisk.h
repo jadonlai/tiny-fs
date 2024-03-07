@@ -5,6 +5,8 @@ int diskCount;
 typedef struct Disk {
     int diskNumber;
     int diskSize;
+    int status;
+    char *filename;
     struct Disk *next;
 } Disk;
 

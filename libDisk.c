@@ -2,6 +2,8 @@
 #include "tinyFS.h"
 #include "TinyFS_errno.h"
 
+Disk *head = NULL;
+
 // opens regular UNIX File
 int openDisk(char *filename, int nBytes) {
     FILE *file;
@@ -12,6 +14,7 @@ int openDisk(char *filename, int nBytes) {
         file = fopen(filename, "r");     // should this be a+ or just r?
 
         // find the disk entry in the list and set it to open! 
+
     }
     else if(nBytes < BLOCKSIZE) {
         /* Issue with nBytes, Return error code */
@@ -24,13 +27,13 @@ int openDisk(char *filename, int nBytes) {
             return ERR_NOFILE; 
         }
 
-        amount = nBytes;
+        int amount = nBytes;
         if (nBytes % BLOCKSIZE != 0) {
             /* if nbytes not multiple of blocksize then set it to the closest multiple */
             amount = nBytes / BLOCKSIZE * BLOCKSIZE;
         } 
 
-        // add file as disk into list now using amount as its size!! 
+        addDiskNode(diskCount, amount, filename); // will this return neg value if issue in addDiskNode
     }
 
     if !(file) {    /* confirming that the file actually was oepned */
@@ -42,20 +45,36 @@ int openDisk(char *filename, int nBytes) {
     return diskCount++;
 }
 
-int closeDisk(int disk) {
-    File *file;
-    // go into our linked list structure, find node where diskNumber matches disk
-    // get that file name and set the file to closed 
 
+void addDiskNode(int diskNumber, int diskSize, char *filename) {
+    // loop through list until we get to end and make new Node (malloc) for disk 
+    // here set the open-close status to open
+}
+
+Disk findDiskNode(int diskNumber) {
+    // find Disk and send back DiskNode?? 
+}
+
+void changeDiskStatus(int diskNumber, int status) {
+    // if disk is closed or open, status should be that value (0 = false, 1 = true)
+    // find disk with diskNumber and change disk's status in node to int status 
+}
+
+int closeDisk(int disk) {
+    Disk wanted_disk = findDiskNode(disk); /* Go into our linked list structure, find diskNode matching diskNum*/
+
+    FILE *file = wanted_disk->file;
     fclose(file);
+
+    changeDiskStatus(disk, 0); /* close disk in linkedlist */
+
     return 0;
 }
 
 int readBlock(int disk, int bNum, void *block) {
-    FILE *file;
-    // go into our linked list structure check that disk exists 
-    // get the disk file name out 
-    file = disk_file_name;
+    Disk wanted_disk = findDiskNode(disk); /* Go into our linked list structure, find diskNode matching diskNum*/
+
+    FILE *file = wanted_disk->file;
 
     /* Check that block is the size of a BLOCKSIZE  */ 
     if (block != NULL && sizeof(block) >= 256) || (block == NULL) {
@@ -63,32 +82,22 @@ int readBlock(int disk, int bNum, void *block) {
     }
 
     startByte = bNum * BLOCKSIZE;
-    // check that startByte is not greater than the size of the file 
+    /*  Check that startByte + BLOCKSIZE is not greater than the size of the file */
+    if (startByte + BLOCKSIZE >= wanted_disk->size) {
+        return ERR_RPASTLIMIT;
+    }
 
-    // go into our file and read the block 
+    /* Go into file and set head of reader at the startByte */
     if (fseek(file, startByte, SEEK_SET) != 0) {
         return ERR_RSEEKISSUE;
     }
 
+    /* Read the BLOCKSIZE into block */
     size_t bytesRead = fread(block, 1, BLOCKSIZE, file);
     if (bytesRead != BLOCKSIZE) {
         return ERR_READISSUE;
     }
-
-    // read block from list, indicate disk integer
-    // and then say what block you want to read from 
-    // void *block = write content in here 
-
-     /* readBlock() reads an entire block of BLOCKSIZE bytes from the open
-    disk (identified by ‘disk’) and copies the result into a local buffer
-    (must be at least of BLOCKSIZE bytes). The bNum is a logical block
-    number, which must be translated into a byte offset within the disk. The
-    translation from logical to physical block is straightforward: bNum=0
-    is the very first byte of the file. bNum=1 is BLOCKSIZE bytes into the
-    disk, bNum=n is n*BLOCKSIZE bytes into the disk. On success, it returns
-    0. -1 or smaller is returned if disk is not available (hasn’t been
-    opened) or any other failures. You must define your own error code
-    system. */
+    
     return 0; 
 }
 

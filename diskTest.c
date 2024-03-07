@@ -1,9 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
 #include "libDisk.h"
-
 
 
 #define NUM_TEST_DISKS 4 /* number of disks to test with */
