@@ -1,17 +1,31 @@
 #include "tinyFS.h"
-#include "<stdio.h>"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
-int diskCount;
+#define OPEN 1
+#define CLOSED 1
+
 typedef struct Disk {
     int diskNumber;
     int diskSize;
     int status;
     char *filename;
+    FILE *file;
     struct Disk *next;
 } Disk;
 
+int diskCount;
+Disk *head = NULL;
+
+int closeDisk(int diskNumber);
+int changeDiskStatusFileName(char* filename, int status);
+int changeDiskStatusNumber(int diskNumber, int status);
+int updateDiskFile(FILE* file, int diskNumber);
+Disk *findDiskNode(int diskNumber);
+int addDiskNode(int diskNumber, int diskSize, char *filename, FILE* file);
 int openDisk(char *filename, int nBytes);
 int closeDisk(int disk);
 int readBlock(int disk, int bNum, void *block);
 int writeBlock(int disk, int bNum, void *block);
-
