@@ -2,6 +2,28 @@
 #include "tinyFS.h"
 #include "TinyFS_errno.h"
 
+Disk *head = NULL;
+int diskCount;
+
+/* THIS SHOULD BE DELETED */
+void printDiskList(Disk *head) {
+    Disk *current = head;
+
+    printf("Disk List:\n");
+    printf("----------------------------------------------------------------\n");
+    printf("| Disk Number | Disk Size | Status | Filename       | File Pointer |\n");
+    printf("----------------------------------------------------------------\n");
+
+    while (current != NULL) {
+        printf("| %-12d| %-10d| %-7d| %-15s| %-13p|\n", 
+               current->diskNumber, current->diskSize, current->status, 
+               current->fileName, current->file);
+        current = current->next;
+    }
+
+    printf("----------------------------------------------------------------\n");
+}
+
 /* opens regular UNIX File */
 int openDisk(char *filename, int nBytes) {
     FILE* file;
@@ -11,25 +33,51 @@ int openDisk(char *filename, int nBytes) {
     if (nBytes == 0) {    
         /* Opens existing file and its contents may not be overwritten */
         file = fopen(filename, "r"); 
-
-        /* Find the disk entry in list with filename and set it to open */
-        diskNumber = changeDiskStatusFileName(filename, OPEN);
-        if (diskNumber < 0) {   /* if error */
-            return ERR_FINDANDCHANGESTATUS;
+        
+        if (file == NULL) {    /* confirming that the file actually was opened */
+            return ERR_NOFILE; 
         }
 
-        /* update the FILE pointer in our node */
-        if (updateDiskFile(file, diskNumber) < 0) {
-            return ERR_CANNOTFNDDISK;
-        }   
+        /* Check if entry exists and if it does not we may have to make a new one */
+        Disk *chosen_disk = findDiskNodeFileName(filename);
+
+        /* If filename does not have an associated disk means that we have disks set up but are not in our linked list */
+        if (chosen_disk == NULL) {
+
+            /* getting size of file */
+            fseek(file, 0, SEEK_END);   /* seeking to end of file*/
+            int size = (int)ftell(file);
+            int diskSize = ((size/BLOCKSIZE) + 1) * BLOCKSIZE; 
+            fseek(file, 0, SEEK_SET);   /* seek to the front */
+
+            if(addDiskNode(diskNumber, diskSize, filename, file)) {
+                return ERR_ADDDISK;
+            }
+            
+            diskCount = diskCount + 1;  /* incrementing diskCount for next disk */
+        }
+        else {  /* if disk entry exists then just update it */
+
+            /* Find the disk entry in list with filename and set it to open */
+            diskNumber = changeDiskStatusFileName(filename, OPEN);
+            if (diskNumber < 0) {   /* if error */
+                return ERR_FINDANDCHANGESTATUS;
+            }
+
+            /* update the FILE pointer in our node */
+            if (updateDiskFile(file, diskNumber) < 0) {
+                return ERR_CANNOTFNDDISK;
+            }  
+        } 
     }
-    else if(nBytes < BLOCKSIZE) { /* Issue with nBytes, Return error code */
+    else if(nBytes < BLOCKSIZE) { 
+        /* Issue with nBytes, Return error code */
         return ERR_NOFILE;
     } else {
         /* Already file given by filename, the file's content may be overwritten */
-        if (access(filename, F_OK) == 0) {  /* file should exist */
-            file = fopen(filename, "w+");
-        } else {
+        file = fopen(filename, "w+");
+
+        if (file == NULL) {    /* confirming that the file actually was opened */
             return ERR_NOFILE; 
         }
 
@@ -43,30 +91,34 @@ int openDisk(char *filename, int nBytes) {
         if(addDiskNode(diskNumber, amount, filename, file)) {
             return ERR_ADDDISK;
         }
-        diskCount++;    /* incrementing diskCount for next disk */
-    }
 
-    if (file == NULL) {    /* confirming that the file actually was opened */
-        return ERR_NOFILE; 
+        diskCount = diskCount + 1;    /* incrementing diskCount for next disk */
     }
 
     /* Return disk number of disk we just were dealing with*/
     return diskNumber;
 }
 
-
 /* Add new disk node to linked list at the end. Return negative value if issue else 0 if success */
-int addDiskNode(int diskNumber, int diskSize, char *filename, FILE* file) {
+int addDiskNode(int diskNum, int diskSize, char *filename, FILE* file) {
+
     /* make disk Node for new disk */ 
     Disk *new_disk = (Disk *)malloc(sizeof(Disk));
     if (new_disk == NULL) {
         return ERR_ADDDISK;
-        /* Q: Where should we free? */
     }
-    new_disk->diskNumber = diskNumber; 
+
+    new_disk->diskNumber = diskNum; 
     new_disk->diskSize = diskSize; 
     new_disk->status = 1; /* open status */
-    new_disk->filename = filename;
+
+    /* copy string into node */
+    new_disk->fileName = (char *)malloc((strlen(filename) + 1) * sizeof(char));
+    if (new_disk->fileName == NULL) {
+        free(new_disk); 
+        return ERR_ADDDISK;
+    }
+    strcpy(new_disk->fileName, filename);   
     new_disk->file = file;
     new_disk->next = NULL;
 
@@ -75,19 +127,35 @@ int addDiskNode(int diskNumber, int diskSize, char *filename, FILE* file) {
         head = new_disk;
         return 0;
     }
+    
     Disk *temp = head;
 
     /* loop through linked list until get to end */
     while(temp->next != NULL) {
         temp = temp->next;
     }
-
     temp->next = new_disk;
+
     return 0;
 }
 
+/* Find the DiskNode based on the filename in our Linked List*/
+Disk *findDiskNodeFileName(char* filename) {
+    Disk *temp = head;
+    while(temp) {
+        if (strcmp(temp->fileName, filename) == 0) {
+            return temp;
+        }
+        else {
+            temp = temp->next;
+        }
+    }  
+    return NULL;
+}
+
+
 /* Find the DiskNode based on diskNumber in our Linked List*/
-Disk *findDiskNode(int diskNumber) {
+Disk *findDiskNodeNumber(int diskNumber) {
     Disk *temp = head;
     while(temp) {
         if (temp->diskNumber == diskNumber) {
@@ -102,7 +170,7 @@ Disk *findDiskNode(int diskNumber) {
 
 
 int updateDiskFile(FILE* file, int diskNumber) {
-    Disk *temp = findDiskNode(diskNumber);
+    Disk *temp = findDiskNodeNumber(diskNumber);
     if(temp == NULL) {
         return ERR_FINDANDCHANGESTATUS;
     } 
@@ -115,7 +183,7 @@ int updateDiskFile(FILE* file, int diskNumber) {
 /* Go through Disk and find disk based on diskNumber. Change status to Open or Closed. 
     Return 0 on success and error on failure. */
 int changeDiskStatusNumber(int diskNumber, int status) {
-    Disk *temp = findDiskNode(diskNumber);
+    Disk *temp = findDiskNodeNumber(diskNumber);
     if(temp == NULL) {
         return ERR_FINDANDCHANGESTATUS;
     } 
@@ -123,37 +191,24 @@ int changeDiskStatusNumber(int diskNumber, int status) {
         temp->status = status;
         return 0;
     }
-    // Disk *temp = head;
-    // while(temp) {
-    //     if (temp->diskNumber == diskNumber) {
-    //         temp->status = status;
-    //         return 0;
-    //     }
-    //     else {
-    //         temp = temp->next;
-    //     }
-    // }  
 }
 
 /* Go through Disk and find disk based on filename. Change status to Open or Closed. 
     Return diskNumber on success or negative value on failure. */
 int changeDiskStatusFileName(char* filename, int status) {
-    Disk *temp = head;
-    while(temp) {
-        if (strcmp(temp->filename, filename) == 0) {
-            temp->status = status;
-            return temp->diskNumber;
-        }
-        else {
-            temp = temp->next;
-        }
-    }  
-    return ERR_FINDANDCHANGESTATUS;
+    Disk *temp = findDiskNodeFileName(filename);
+    if(temp == NULL) {
+        return ERR_FINDANDCHANGESTATUS;
+    } 
+    else {
+        temp->status = status;
+        return temp->diskNumber;
+    }
 }
 
 int closeDisk(int diskNumber) {
     /* Find wanted disk */
-    Disk* wanted_disk = findDiskNode(diskNumber); /* Go into our linked list structure, find diskNode matching diskNum*/
+    Disk* wanted_disk = findDiskNodeNumber(diskNumber); /* Go into our linked list structure, find diskNode matching diskNum*/
     if(wanted_disk == NULL) {
         return ERR_CANNOTFNDDISK;
     }
@@ -171,7 +226,7 @@ int closeDisk(int diskNumber) {
 }
 
 int readBlock(int disk, int bNum, void *block) {
-    Disk* wanted_disk = findDiskNode(disk); /* Go into our linked list structure, find diskNode matching diskNum*/
+    Disk* wanted_disk = findDiskNodeNumber(disk); /* Go into our linked list structure, find diskNode matching diskNum*/
     if(wanted_disk == NULL) {
         return ERR_CANNOTFNDDISK;
     }
@@ -195,7 +250,7 @@ int readBlock(int disk, int bNum, void *block) {
 
     /* Go into file and set head of reader at the startByte */
     if (fseek(file, startByte, SEEK_SET) != 0) {
-        return ERR_RSEEKISSUE;
+        return ERR_FINDANDCHANGESTATUS;
     }
 
     /* Read the BLOCKSIZE into block */
@@ -208,7 +263,7 @@ int readBlock(int disk, int bNum, void *block) {
 }
 
 int writeBlock(int disk, int bNum, void *block) {
-    Disk *wanted_disk = findDiskNode(disk); /* Go into our linked list structure, find diskNode matching diskNum*/
+    Disk *wanted_disk = findDiskNodeNumber(disk); /* Go into our linked list structure, find diskNode matching diskNum*/
     if(wanted_disk == NULL) {
         return ERR_CANNOTFNDDISK;
     }

@@ -11,19 +11,17 @@ typedef struct Disk {
     int diskNumber;
     int diskSize;
     int status;
-    char *filename;
+    char *fileName;
     FILE *file;
     struct Disk *next;
 } Disk;
-
-int diskCount;
-Disk *head = NULL;
 
 int closeDisk(int diskNumber);
 int changeDiskStatusFileName(char* filename, int status);
 int changeDiskStatusNumber(int diskNumber, int status);
 int updateDiskFile(FILE* file, int diskNumber);
-Disk *findDiskNode(int diskNumber);
+Disk *findDiskNodeNumber(int diskNumber);
+Disk *findDiskNodeFileName(char *filename);
 int addDiskNode(int diskNumber, int diskSize, char *filename, FILE* file);
 int openDisk(char *filename, int nBytes);
 int closeDisk(int disk);
