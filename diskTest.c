@@ -32,6 +32,8 @@ int main() {
         diskName[4] = '0' + index;
         disks[index] = openDisk(diskName, 0);  // first time, running disk does not exist
         
+        printf("%d", index); 
+        
         if (disks[index] < 0) { 
             printf("] Open failed with (%i). Disk probably does not exist.\n", disks[index]);
 

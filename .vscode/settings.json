@@ -1,5 +1,9 @@
 {
     "files.associations": {
-        "libdisk.h": "c"
+        "libdisk.h": "c",
+        "tinyfs.h": "c",
+        "stdio.h": "c",
+        "unistd.h": "c",
+        "tinyfs_errno.h": "c"
     }
 }
