@@ -2,6 +2,11 @@
 
 
 
+#define SUPERBLOCK 1
+#define INODE 2
+#define FILE_EXTENT 3
+#define FREE_BLOCK 4
+
 int tfs_mkfs(char *filename, int nBytes);
 int tfs_mount(char *diskname);
 int tfs_unmount(void);
