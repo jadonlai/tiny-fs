@@ -4,8 +4,16 @@
 
 #define SUPERBLOCK 1
 #define INODE 2
-#define FILE_EXTENT 3
-#define FREE_BLOCK 4
+#define FILEEXTENT 3
+#define FREEBLOCK 4
+#define MAGIC 0x44
+#define DATASIZE 252
+
+typedef struct ResourceTable {
+    int *inodes;
+    fileDescriptor *filePointers;
+    char **names;
+} ResourceTable;
 
 int tfs_mkfs(char *filename, int nBytes);
 int tfs_mount(char *diskname);
