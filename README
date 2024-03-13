@@ -1,6 +1,7 @@
 Jadon Lai, Mira Shlimenzon, Sarah Hallam
 
 Implementation: 
-Command to run to test libDisk.c with  diskTest.c `gcc -Wall -g diskTest.c libDisk.h libDisk.c TinyFS_errno.h tinyFS.h`
+Command to run to test libDisk.c with diskTest.c `gcc -Wall -g diskTest.c libDisk.h libDisk.c TinyFS_errno.h tinyFS.h`
+Command to run to test libTinyFS.c with tfsTest.c `gcc -Wall -g tfsTest.c libTinyFS.h libTinyFS.c TinyFS_errno.h tinyFS.h libDisk.h libDisk.c`
 
 Additional Functionality: 

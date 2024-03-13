@@ -38,27 +38,28 @@ int main() {
   char phrase2[] = "(b) file content ";
 
   fileDescriptor aFD, bFD;
-  int i, returnValue;
+
+  char *defaultDiskName = "tinyFSDisk";
 
   /* try to mount the disk */
-  if (tfs_mount(DEFAULT_DISK_NAME) < 0) {             /* if mount fails */
-    tfs_mkfs(DEFAULT_DISK_NAME, DEFAULT_DISK_SIZE);	  /* then make a new disk */
-    if (tfs_mount(DEFAULT_DISK_NAME) < 0) {	          /* if we still can't open it... */
-	    perror("failed to open disk");	                /* then just exit */
-	    return;
+  if (tfs_mount(defaultDiskName) < 0) {             /* if mount fails */
+    tfs_mkfs(defaultDiskName, DEFAULT_DISK_SIZE);	  /* then make a new disk */
+    if (tfs_mount(defaultDiskName) < 0) {	          /* if we still can't open it... */
+	    perror("failed to open disk");	              /* then just exit */
+	    return 1;
 	  }
   }
 
   afileContent = (char *) malloc(afileSize * sizeof(char));
   if(fillBufferWithPhrase(phrase1, afileContent, afileSize) < 0) {
     perror("failed");
-    return;
+    return 1;
   }
 
   bfileContent = (char *) malloc(bfileSize * sizeof(char));
   if (fillBufferWithPhrase(phrase2, bfileContent, bfileSize) < 0) {
     perror("failed");
-    return;
+    return 1;
   }
 
   /* print content of files for debugging */
