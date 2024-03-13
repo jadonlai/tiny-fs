@@ -18,6 +18,7 @@ typedef struct FileDetails {
     char *name;
     fileDescriptor fd;
     int filePointer;
+    int blockNum;
 } FileDetails;
 
 extern int tfs_mkfs(char *filename, int nBytes);
