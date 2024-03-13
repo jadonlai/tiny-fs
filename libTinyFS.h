@@ -11,6 +11,7 @@
 #define READ 1
 #define WRITE 2
 #define READWRITE 3
+#define NUM_BLOCKS 40
 
 typedef struct FileDetails {
     int inode;

@@ -11,6 +11,15 @@ int resourceTablePointer = 0;
 
 
 
+void print_disk(int diskNum) {
+    int i;
+    int block[BLOCKSIZE];
+    for (i = 0; i < NUM_BLOCKS; i++) {
+        readBlock(diskNum, i, block);
+        printf("%d\n", block[0]);
+    }
+}
+
 // Given a pointer to a block, a type, magic, link_addr, data, and data size, create the block
 void create_block(int *block, int type, int link_addr, int *data, int data_size) {
     // Init type, magic, and link_addr
@@ -116,7 +125,7 @@ int update_rt_pointer() {
 // Return the disk number on success or error code on failure
 int tfs_mkfs(char *filename, int nBytes) {
     // Init variables
-    int i;
+    int i, status;
 
     // Make a disk on the file
     int diskNum = openDisk(filename, nBytes);
@@ -127,18 +136,26 @@ int tfs_mkfs(char *filename, int nBytes) {
     // Create the superblock
     int block[BLOCKSIZE];
     create_block(block, SUPERBLOCK, 1, NULL, 0);
+    status = writeBlock(diskNum, 0, block);
     // Write the superblock to the disk
-    if (writeBlock(diskNum, 0, block) < 0) {
+    if (status < 0) {
         return ERR_WBLOCKISSUE;
     }
     
     // Write free blocks
     for (i = 1; i < NUM_BLOCKS; i++) {
-        create_block(block, FREEBLOCK, i, NULL, 0);
-        if (writeBlock(diskNum, 0, block) < 0) {
+        create_block(block, FREEBLOCK, i + 1, NULL, 0);
+        status = writeBlock(diskNum, i, block);
+        if (status < 0) {
             return ERR_WBLOCKISSUE;
         }
     }
+
+    // PRINT TESTING
+    printf("Made disk %d\n", diskNum);
+
+    // Close the disk
+    closeDisk(diskNum);
 
     // Return the disk number on success
     return diskNum;
@@ -149,13 +166,13 @@ int tfs_mkfs(char *filename, int nBytes) {
 int tfs_mount(char *diskname) {
     // Init variables
     int i, status;
-    FILE *file = fopen(diskname, "r");
+    FILE *file = fopen(diskname, "rw+");
     if (!file) {
         return ERR_FILEISSUE;
     }
 
     // Ensure that there's not already a disk mounted
-    if (curDisk == -1) {
+    if (curDisk != -1) {
         return ERR_MOUNTMULTIPLE;
     }
 
@@ -164,6 +181,9 @@ int tfs_mount(char *diskname) {
     if (diskNum < 0) {
         return diskNum;
     }
+
+    // PRINT TESTING
+    printf("Opening disk %d to mount\n", diskNum);
 
     // Ensure that file system is formatted correctly
     int block[BLOCKSIZE];
@@ -188,6 +208,11 @@ int tfs_mount(char *diskname) {
 
     // Mount disk
     curDisk = diskNum;
+
+    // PRINT TESTING
+    printf("File is formatted correctly\n");
+    printf("Mounted disk %d\n", curDisk);
+
     return curDisk;
 }
 
@@ -226,6 +251,13 @@ fileDescriptor tfs_openFile(char *name) {
                 fileExists = 1;
             }
         }
+    }
+
+    // PRINT TESTING
+    if (fileExists) {
+        printf("Opening existing file %s\n", name);
+    } else {
+        printf("Creating nonexisting file %s\n", name);
     }
 
     // Check that there are inodes available
@@ -291,6 +323,10 @@ fileDescriptor tfs_openFile(char *name) {
         create_block(inodeBlock, INODE, 0, inodeData, ++i);
         writeBlock(curDisk, freeBlock, inodeBlock);
     }
+
+    // PRINT TESTING
+    printf("Created file with inode: %d, name: %s, fd: %d\n", file->inode, file->name, file->fd);
+    pause();
 
     // Return file descriptor
     return file->fd;

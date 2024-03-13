@@ -281,7 +281,7 @@ int writeBlock(int disk, int bNum, void *block) {
 
     int startByte = bNum * BLOCKSIZE;
     /*  Check that startByte + BLOCKSIZE is not greater than the size of the file */
-    if (startByte + BLOCKSIZE >= wanted_disk->diskSize) {
+    if (startByte + BLOCKSIZE > wanted_disk->diskSize) {
         return ERR_RPASTLIMIT;
     }
     
