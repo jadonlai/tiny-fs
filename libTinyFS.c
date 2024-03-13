@@ -11,15 +11,6 @@ int resourceTablePointer = 0;
 
 
 
-void reset_rt() {
-    int i;
-    for (i = 0; i < NUM_BLOCKS - 1; i++) {
-        if (resourceTable[i]) {
-            resourceTable[i] = NULL;
-        }
-    }
-}
-
 // Given a pointer to a block, a type, magic, link_addr, data, and data size, create the block
 void create_block(int *block, int type, int link_addr, int *data, int data_size) {
     // Init type, magic, and link_addr
