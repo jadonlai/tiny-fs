@@ -3,7 +3,7 @@
 #include "TinyFS_errno.h"
 
 Disk *head = NULL;
-int diskCount;
+int diskCount = 0;
 
 /* THIS SHOULD BE DELETED */
 void printDiskList(Disk *head) {
@@ -32,7 +32,7 @@ int openDisk(char *filename, int nBytes) {
     /* Opens file + designates first nBytes as space for emulated disk */
     if (nBytes == 0) {    
         /* Opens existing file and its contents may not be overwritten */
-        file = fopen(filename, "r"); 
+        file = fopen(filename, "w+"); 
         
         if (file == NULL) {    /* confirming that the file actually was opened */
             return ERR_NOFILE; 

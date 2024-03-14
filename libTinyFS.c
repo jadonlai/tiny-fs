@@ -16,10 +16,12 @@ int resourceTablePointer = 0;
 void print_disk(int diskNum) {
     int i;
     int block[BLOCKSIZE];
+    printf("\nDISK\n-------------------------\n");
     for (i = 0; i < NUM_BLOCKS; i++) {
         readBlock(diskNum, i, block);
         printf("type: %d, link: %d\n", block[0], block[2]);
     }
+    printf("-------------------------\n\n");
 }
 
 void print_rt() {
@@ -52,65 +54,91 @@ void create_block(int *block, int type, int link_addr, int *data, int data_size)
     }
 }
 
-// Return the block number of the next free block or error code on failure
-int get_free_block() {
+// Given a num and buffer, add that num of free blocks to the buffer and remove them from the free block chain
+// Return 0 on success or error code on failure
+int fbc_get(int num, int* buffer) {
     // Init variables
-    int status;
-
-    // Read superblock
-    int superblock[BLOCKSIZE];
-    status = readBlock(curDisk, 0, superblock);
-    if (status < 0) {
-        return status;
-    }
-
-    // Check that there's a free block available
-    if (superblock[2] == 0) {
-        return ERR_FULLDISK;
-    }
-
-    // Return next free block
-    return superblock[2];
-}
-
-// Disk was full, so we need to reinitialize the free block list
-// Return the next next free block on success or error code on failure
-int init_free_blocks() {
-    // Init variables
-    int i, status;
-
-    // Read superblock
-    int superblock[BLOCKSIZE];
-    status = readBlock(curDisk, 0, superblock);
-    if (status < 0) {
-        return status;
-    }
-
+    int status, i;
     int curBlock[BLOCKSIZE];
-    // Iterate through every block
-    for (i = 1; i < NUM_BLOCKS; i++) {
+
+    // For every free block
+    for (i = 0; i < num; i++) {
         // Read block
-        status = readBlock(curDisk, i, curBlock);
+        if (i == 0) {
+            status = readBlock(curDisk, 0, curBlock);
+        } else {
+            status = readBlock(curDisk, curBlock[2], curBlock);
+        }
         if (status < 0) {
             return status;
         }
 
-        // Found free block, update the superblock and break
-        if (curBlock[0] == FREEBLOCK) {
-            // Update superblock
-            superblock[2] = i;
-            break;
+        // Check that there's free blocks available
+        if (curBlock[2] == 0) {
+            return ERR_FULLDISK;
+        }
+
+        // Add free block
+        buffer[i] = curBlock[2];
+    }
+
+    // Update superblock to point to the next free block
+    int nextFreeBlock = curBlock[2];
+    // Read superblock
+    status = readBlock(curDisk, 0, curBlock);
+    if (status < 0) {
+        return status;
+    }
+    // Update pointer
+    curBlock[2] = nextFreeBlock;
+
+    // Finished successfully
+    return 0;
+}
+
+// Given a diskNum, num, and buffer, add that num of free blocks in the buffer to the free block chain
+// Return 0 on success or error code on failure
+int fbc_set(int diskNum, int num, int* buffer) {
+    // Init variables
+    int status, i, lastBlockNum = 0;
+    int curBlock[BLOCKSIZE], freeBlock[BLOCKSIZE];
+
+    // Read superblock
+    status = readBlock(diskNum, 0, curBlock);
+    if (status < 0) {
+        return status;
+    }
+
+    // Get to the last free block
+    while (curBlock[2] != 0) {
+        lastBlockNum = curBlock[2];
+        status = readBlock(diskNum, curBlock[2], curBlock);
+        if (status < 0) {
+            return status;
         }
     }
 
-    // If there's no free block, set the superblock's next free block to 0
-    if (i == NUM_BLOCKS) {
-        superblock[2] = 0;
-    }
-    writeBlock(curDisk, 0, superblock);
+    // Update the block's link
+    curBlock[2] = buffer[0];
+    status = writeBlock(diskNum, lastBlockNum, curBlock);
 
-    // Return the next next free block or 0 if the disk is full
-    return superblock[2];
+    // For every free block
+    for (i = 0; i < num; i++) {
+        // Create free block
+        if (i < num - 1) {
+            create_block(freeBlock, FREEBLOCK, buffer[i + 1], NULL, 0);
+        } else {
+            create_block(freeBlock, FREEBLOCK, 0, NULL, 0);
+        }
+        // Write free block to disk
+        status = writeBlock(diskNum, buffer[i], freeBlock);
+        if (status < 0) {
+            return status;
+        }
+    }
+
+    // Finished successfully
+    return 0;
 }
 
 // Update the resource table pointer to the next empty spot
@@ -160,6 +188,10 @@ int get_file_idx(fileDescriptor fd) {
 int tfs_mkfs(char *filename, int nBytes) {
     // Init variables
     int i, status;
+    int freeBlocks[NUM_BLOCKS - 1];
+    for (i = 1; i < NUM_BLOCKS; i++) {
+        freeBlocks[i - 1] = i;
+    }
 
     // Make a disk on the file
     int diskNum = openDisk(filename, nBytes);
@@ -168,29 +200,23 @@ int tfs_mkfs(char *filename, int nBytes) {
     }
 
     // Create the superblock
-    int block[BLOCKSIZE];
-    create_block(block, SUPERBLOCK, 1, NULL, 0);
-    status = writeBlock(diskNum, 0, block);
-    // Write the superblock to the disk
+    int superblock[BLOCKSIZE];
+    create_block(superblock, SUPERBLOCK, 0, NULL, 0);
+    // Write superblock to the disk
+    status = writeBlock(diskNum, 0, superblock);
     if (status < 0) {
         return ERR_WBLOCKISSUE;
     }
     
     // Write free blocks
-    for (i = 1; i < NUM_BLOCKS; i++) {
-        if (i == NUM_BLOCKS - 1) {
-            create_block(block, FREEBLOCK, 0, NULL, 0);
-        } else {
-            create_block(block, FREEBLOCK, i + 1, NULL, 0);
-        }
-        status = writeBlock(diskNum, i, block);
-        if (status < 0) {
-            return ERR_WBLOCKISSUE;
-        }
+    status = fbc_set(diskNum, NUM_BLOCKS - 1, freeBlocks);
+    if (status < 0) {
+        return status;
     }
 
     // PRINT TESTING
-    printf("Made disk %d\n\n", diskNum);
+    printf("\nMade disk %d\n", diskNum);
+    print_disk(diskNum);
 
     // Close the disk
     closeDisk(diskNum);
@@ -204,11 +230,7 @@ int tfs_mkfs(char *filename, int nBytes) {
 int tfs_mount(char *diskname) {
     // Init variables
     int i, status;
-    FILE *file = fopen(diskname, "rw+");
-    if (!file) {
-        return ERR_FILEISSUE;
-    }
-
+    
     // Ensure that there's not already a disk mounted
     if (curDisk != -1) {
         return ERR_MOUNTMULTIPLE;
@@ -249,6 +271,7 @@ int tfs_mount(char *diskname) {
 
     // PRINT TESTING
     printf("File is formatted correctly\n");
+    print_disk(curDisk);
     printf("Mounted disk %d\n\n", curDisk);
 
     return curDisk;
@@ -279,6 +302,7 @@ int tfs_unmount(void) {
 fileDescriptor tfs_openFile(char *name) {
     // Init variables
     int i, status, startBlock = 0, fileExists = 0;
+    int buffer[1];
 
     // Check if file already exists
     int curBlock[BLOCKSIZE];
@@ -301,9 +325,9 @@ fileDescriptor tfs_openFile(char *name) {
 
     // PRINT TESTING
     if (fileExists) {
-        printf("Opening existing file %s\n\n", name);
+        printf("\nOpening existing file %s\n\n", name);
     } else {
-        printf("Creating nonexisting file %s\n", name);
+        printf("\nCreating nonexisting file %s\n", name);
     }
 
     // Check that there are inodes available
@@ -331,79 +355,44 @@ fileDescriptor tfs_openFile(char *name) {
 
     // If the file doesn't exist, we need to create an inode block for it in the disk
     if (!fileExists) {
+        // Get next free block
+        status = fbc_get(1, buffer);
+        if (status < 0) {
+            free(file);
+            return status;
+        }
+
         // Add inode block to disk
         int inodeBlock[BLOCKSIZE];
         // Write name and size to inode block
         int inodeData[DATASIZE];
-        strcpy((char *) inodeData, name);
-        i = 0;
-        while (inodeData[i]) {
-            i++;
+        for (i = 0; name[i] != 0; i++) {
+            inodeData[i] = name[i];
         }
-        inodeData[++i] = 0;
-
-        // Get the next free block
-        int freeBlock = get_free_block();
-        // Failure
-        if (freeBlock < 0) {
-            return freeBlock;
-        // Memory is full, try to reinit the free block
-        } else if (freeBlock == 0) {
-            // If there's still no free block, return error
-            if (init_free_blocks() == 0) {
-                free(file);
-                return ERR_FULLDISK;
-            }
-            // If there is a free block, get it
-            freeBlock = get_free_block();
-        }
-        // Update the block number of the file
-        file->blockNum = freeBlock;
-
-        // Update next free block
-        status = readBlock(curDisk, freeBlock, curBlock);
-        if (status < 0) {
+        if (i > MAXNAMECHARS) {
             free(file);
-            return status;
+            return ERR_FILENAMELIMIT;
         }
-        int superblock[BLOCKSIZE];
-        // No more free blocks
-        if (curBlock[2] == 0) {
-            // Set the superblock's free block link to 0
-            status = readBlock(curDisk, 0, superblock);
-            if (status < 0) {
-                free(file);
-                return status;
-            }
-            curBlock[2] = 0;
-        // Free blocks
-        } else {
-            // Update the superblock's free block link to the next free block
-            superblock[2] = curBlock[2];
-        }
-        
-        print_disk(curDisk);
+        inodeData[i++] = 0;
+        inodeData[i] = 0;
 
-        // Write the updated superblock
-        status = writeBlock(curDisk, 0, superblock);
-        if (status < 0) {
-            free(file);
-            // SHOULDN"T ENTER HERE
-            printf("test %d\n", status);
-            return status;
-        }
         // Create the inode block and write it to the disk
         create_block(inodeBlock, INODE, 0, inodeData, ++i);
-        status = writeBlock(curDisk, freeBlock, inodeBlock);
+        status = writeBlock(curDisk, buffer[0], inodeBlock);
         if (status < 0) {
+            // SOMETHING GOES WRONG HERE
             free(file);
             return (status);
         }
+
+        // PRINT TESTING
+        printf("Created file with inode: %d, name: %s, fd: %d, blockNum: %d\n\n",
+        file->inode, file->name, file->fd, file->blockNum);
     }
 
     // PRINT TESTING
-    printf("Created file with inode: %d, name: %s, fd: %d, blockNum: %d\n\n",
-    file->inode, file->name, file->fd, file->blockNum);
+    print_disk(curDisk);
+    pause();
 
     // Return file descriptor
     return file->fd;
