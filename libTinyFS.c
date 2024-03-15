@@ -19,18 +19,20 @@ void print_disk(int diskNum) {
     printf("\nDISK %d\n-------------------------\n", diskNum);
     for (i = 0; i < NUM_BLOCKS; i++) {
         readBlock(diskNum, i, block);
-        printf("type: %d, link: %d\n", block[0], block[2]);
+        printf("num: %d, type: %d, link: %d\n", i, block[0], block[2]);
     }
     printf("-------------------------\n\n");
 }
 
 void print_rt() {
     int i;
+    printf("\nRESOURCE TABLE\n-------------------------\n");
     for (i = 0; i < NUM_BLOCKS - 1; i++) {
         if (resourceTable[i] != NULL) {
             printf("file descriptor: %d, name: %s\n", resourceTable[i]->fd, resourceTable[i]->name);
         }
     }
+    printf("-------------------------\n\n");
 }
 
 // Given a pointer to a block, a type, magic, link_addr, data, and data size, create the block
@@ -82,8 +84,13 @@ int fbc_get(int num, int* buffer) {
         buffer[i] = curBlock[2];
     }
 
-    // Update superblock to point to the next free block
+    // Get the next next free block
+    status = readBlock(curDisk, curBlock[2], curBlock);
+    if (status < 0) {
+        return status;
+    }
     int nextFreeBlock = curBlock[2];
+
     // Read superblock
     status = readBlock(curDisk, 0, curBlock);
     if (status < 0) {
@@ -91,6 +98,12 @@ int fbc_get(int num, int* buffer) {
     }
     // Update pointer
     curBlock[2] = nextFreeBlock;
+
+    // Write superblock
+    status = writeBlock(curDisk, 0, curBlock);
+    if (status < 0) {
+        return status;
+    }
 
     // Finished successfully
     return 0;
@@ -103,6 +116,11 @@ int fbc_set(int diskNum, int num, int* buffer) {
     int i, lastBlockNum = 0;
     int curBlock[BLOCKSIZE], freeBlock[BLOCKSIZE];
 
+    // No free blocks to add
+    if (!num) {
+        return 0;
+    }
+
     // Read superblock
     int status = readBlock(diskNum, 0, curBlock);
     if (status < 0) {
@@ -110,7 +128,7 @@ int fbc_set(int diskNum, int num, int* buffer) {
     }
 
     // Get to the last free block
-    while (curBlock[2] != 0) {
+    while (curBlock[2]) {
         lastBlockNum = curBlock[2];
         status = readBlock(diskNum, curBlock[2], curBlock);
         if (status < 0) {
@@ -136,11 +154,6 @@ int fbc_set(int diskNum, int num, int* buffer) {
             return status;
         }
     }
-
-    print_disk(0);
-    print_disk(1);
-    print_disk(2);
-    print_disk(3);
 
     // Finished successfully
     return 0;
@@ -169,23 +182,19 @@ int update_rt_pointer() {
 // Return index on success or error code on failure
 int get_file_idx(fileDescriptor fd) {
     // Init variables
-    int i, idx = 0;
+    int i;
 
     // Set i to the index of the open file in our resource table
     for (i = 0; i < NUM_BLOCKS - 1; i++) {
-        if (resourceTable[i] && resourceTable[i]->fd == fd) {
-            idx = i;
-            break;
+        if (resourceTable[i]) {
+            if (resourceTable[i]->fd == fd) {
+                return i;
+            }
         }
     }
 
-    // Couldn't find file
-    if (idx == 0) {
-        return ERR_NOFILE;
-    }
-
-    // Found file, return the idx
-    return idx;
+    // Couldn't find the file
+    return ERR_NOFILE;
 }
 
 // Given a filename and number of bytes, create a filesystem of size nBytes on the filename
@@ -197,6 +206,9 @@ int tfs_mkfs(char *filename, int nBytes) {
     for (i = 1; i < NUM_BLOCKS; i++) {
         freeBlocks[i - 1] = i;
     }
+
+    // PRINT TESTING
+    printf("tfs_mkfs\n");
 
     // Make a disk on the file
     int diskNum = openDisk(filename, nBytes);
@@ -219,12 +231,8 @@ int tfs_mkfs(char *filename, int nBytes) {
         return status;
     }
 
-    // PRINT TESTING
-    printf("\nMade disk %d\n", diskNum);
-    print_disk(diskNum);
-
-    // Close the disk
-    closeDisk(diskNum);
+    // Set to the current disk
+    curDisk = diskNum;
 
     // Return the disk number on success
     return diskNum;
@@ -235,20 +243,22 @@ int tfs_mkfs(char *filename, int nBytes) {
 int tfs_mount(char *diskname) {
     // Init variables
     int i, status;
-    
+
+    printf("tfs_mount\n");
+
     // Ensure that there's not already a disk mounted
-    if (curDisk != -1) {
-        return ERR_MOUNTMULTIPLE;
-    }
+    // if (curDisk != -1) {
+    //     return ERR_MOUNTMULTIPLE;
+    // }
 
     // Open disk
-    int diskNum = openDisk(diskname, DEFAULT_DISK_SIZE * BLOCKSIZE);
+    int diskNum = openDisk(diskname, 0);
     if (diskNum < 0) {
         return diskNum;
     }
-
-    // PRINT TESTING
-    printf("Opening disk %d to mount\n", diskNum);
+    //int diskNum = curDisk;
+    /* MOUNT SHOULD BE ABLE TO MOUNT A DISK FROM A PREVIOUSLY CREATED FILE */
+    /* SO WE DON'T HAVE TO CREATE A DISK IF TINYFSDISK IS ALREADY MADE */
 
     // Ensure that file system is formatted correctly
     int block[BLOCKSIZE];
@@ -262,6 +272,7 @@ int tfs_mount(char *diskname) {
         // Check the superblock
         if (i == 0) {
             if (block[0] != SUPERBLOCK || block[2] > NUM_BLOCKS - 1 || block[2] < 0 || block[3] != 0x00) {
+                closeDisk(diskNum);
                 return ERR_BLOCKFORMAT;
             }
         }
@@ -274,17 +285,15 @@ int tfs_mount(char *diskname) {
     // Mount disk
     curDisk = diskNum;
 
-    // PRINT TESTING
-    printf("File is formatted correctly\n");
-    print_disk(curDisk);
-    printf("Mounted disk %d\n\n", curDisk);
-
     return curDisk;
 }
 
 // Unmount the current disk
 // Return 0 on success or error code on failure
 int tfs_unmount(void) {
+    // PRINT TESTING
+    printf("tfs_unmount\n");
+
     // Close disk
     int status = closeDisk(curDisk);
     if (status < 0) {
@@ -301,6 +310,9 @@ fileDescriptor tfs_openFile(char *name) {
     // Init variables
     int i, status, startBlock = 0, fileExists = 0;
     int buffer[1];
+
+    // PRINT TESTING
+    printf("tfs_openFile\n");
 
     // Check if file already exists
     int curBlock[BLOCKSIZE];
@@ -319,13 +331,6 @@ fileDescriptor tfs_openFile(char *name) {
                 break;
             }
         }
-    }
-
-    // PRINT TESTING
-    if (fileExists) {
-        printf("\nOpening existing file %s\n\n", name);
-    } else {
-        printf("\nCreating nonexisting file %s\n", name);
     }
 
     // Check that there are inodes available
@@ -378,22 +383,14 @@ fileDescriptor tfs_openFile(char *name) {
         create_block(inodeBlock, INODE, 0, inodeData, ++i);
         status = writeBlock(curDisk, buffer[0], inodeBlock);
         if (status < 0) {
-            // SOMETHING GOES WRONG HERE
+            printf("%d err\n", status);
             free(file);
             return (status);
         }
 
         // Set the file's block number in the resource table
         file->blockNum = buffer[0];
-
-        // PRINT TESTING
-        printf("Created file with inode: %d, name: %s, fd: %d, blockNum: %d\n\n",
-        file->inode, file->name, file->fd, file->blockNum);
     }
-
-    // PRINT TESTING
-    print_disk(curDisk);
-    pause();
 
     // Return file descriptor
     return file->fd;
@@ -404,6 +401,9 @@ fileDescriptor tfs_openFile(char *name) {
 int tfs_closeFile(fileDescriptor FD) {
     // Init variables
     int i, status;
+
+    // PRINT TESTING
+    printf("tfs_closeFile\n");
 
     // Find the file
     for (i = 0; i < NUM_BLOCKS - 1; i++) {
@@ -431,7 +431,10 @@ int tfs_closeFile(fileDescriptor FD) {
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     // Init variables
     int curSize, i = 0;
-    int curBlock[BLOCKSIZE], superblock[BLOCKSIZE], curDataBlocks[NUM_BLOCKS - 2];
+    int curBlock[BLOCKSIZE], superblock[BLOCKSIZE], inodeBlock[BLOCKSIZE], curDataBlocks[NUM_BLOCKS - 2];
+
+    // PRINT TESTING
+    printf("tfs_writeFile\n");
 
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
@@ -441,24 +444,26 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     // Set the file pointer to 0
     resourceTable[idx]->filePointer = 0;
 
-    // Get the file's inode block
-    int status = readBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
+    // Get the file's inode block and initialize the current block
+    int status = readBlock(curDisk, resourceTable[idx]->blockNum, inodeBlock);
+    if (status < 0) {
+        return status;
+    }
+    memcpy(curBlock, inodeBlock, BLOCKSIZE);
+
+    // Get the superblock
+    status = readBlock(curDisk, 0, superblock);
     if (status < 0) {
         return status;
     }
 
-    // Get the superblock
-    status = readBlock(curDisk, 0, superblock);
-
-    // Update inode block
-    curBlock[2] = superblock[2];
-    while (curBlock[i]) {
+    // Update inode block's link and data size
+    inodeBlock[2] = superblock[2];
+    while (inodeBlock[i]) {
         i++;
     }
-    curBlock[++i] = size;
-
-    // Write the new inode block
-    writeBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
+    inodeBlock[++i] = size;
+    i = 0;
 
     // Iterate through each data block to get their block numbers and total number of blocks
     while (curBlock[2]) {
@@ -472,8 +477,14 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     // Free the file's current data blocks
     fbc_set(curDisk, i, curDataBlocks);
 
+    // Write the new inode block
+    status = writeBlock(curDisk, resourceTable[idx]->blockNum, inodeBlock);
+    if (status < 0) {
+        return status;
+    }
+
     // Number of blocks needed
-    int numBlocks = ceil(size / DATASIZE);
+    int numBlocks = ceil((float) size / (float) DATASIZE);
     int freeBlocks[numBlocks];
 
     // Get next free blocks
@@ -504,10 +515,6 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
         writeBlock(curDisk, freeBlocks[i], curBlock);
     }
 
-    // PRINT TESTING
-    printf("Writing %d blocks\n", numBlocks);
-    printf("Data: %s\n\n", buffer);
-
     // Finished successfully
     return 0;
 }
@@ -518,6 +525,9 @@ int tfs_deleteFile(fileDescriptor FD) {
     // Init variables
     int i = 0;
     int fileBlocks[NUM_BLOCKS - 1], curBlock[BLOCKSIZE];
+
+    // PRINT TESTING
+    printf("tfs_deleteFile\n");
     
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
@@ -550,6 +560,9 @@ int tfs_deleteFile(fileDescriptor FD) {
 // Read a byte into the given buffer from a file at its pointer and increment the pointer
 // Return 0 on success or error code on failure
 int tfs_readByte(fileDescriptor FD, char *buffer) {
+    // PRINT TESTING
+    printf("tfs_readByte\n");
+
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
     if (idx < 0) {
@@ -569,9 +582,11 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
         i++;
     }
     int size = block[++i];
+    printf("size %d\n", size);
 
     // Check that file pointer is within range
     if (resourceTable[idx]->filePointer >= size || resourceTable[idx]->filePointer < 0) {
+        printf("error %d\n", resourceTable[idx]->filePointer);
         return ERR_RSEEKISSUE;
     }
 
@@ -593,10 +608,6 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
     // Read byte based on offset
     *buffer = block[4 + offset];
 
-    // PRINT TESTING
-    printf("Read byte %c from file %s\n", *buffer, resourceTable[idx]->name);
-    printf("File pointer moved from %d to %d\n\n", resourceTable[idx]->filePointer - 1, resourceTable[idx]->filePointer);
-
     // Increment file pointer
     resourceTable[idx]->filePointer++;
 
@@ -607,6 +618,9 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
 // Change the file pointer location to the offset (absolute)
 // Return 0 on success or error code on failure
 int tfs_seek(fileDescriptor FD, int offset) {
+    // PRINT TESTING
+    printf("tfs_seek\n");
+
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
     if (idx < 0) {

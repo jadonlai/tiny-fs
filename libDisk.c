@@ -85,7 +85,7 @@ int openDisk(char *filename, int nBytes) {
         if (nBytes % BLOCKSIZE != 0) {
             /* if nbytes not multiple of blocksize then set it to the closest multiple */
             amount = (nBytes / BLOCKSIZE + 1) * BLOCKSIZE;
-        } 
+        }
 
         /* Add new disk to linked list */
         if(addDiskNode(diskNumber, amount, filename, file)) {
@@ -244,7 +244,7 @@ int readBlock(int disk, int bNum, void *block) {
     int startByte = bNum * BLOCKSIZE;
 
     /*  Check that startByte + BLOCKSIZE is not greater than the size of the file */
-    if (startByte + BLOCKSIZE >= wanted_disk->diskSize) {
+    if (startByte + BLOCKSIZE > wanted_disk->diskSize) {
         return ERR_RPASTLIMIT;
     }
 
