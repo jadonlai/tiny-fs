@@ -100,11 +100,11 @@ int fbc_get(int num, int* buffer) {
 // Return 0 on success or error code on failure
 int fbc_set(int diskNum, int num, int* buffer) {
     // Init variables
-    int status, i, lastBlockNum = 0;
+    int i, lastBlockNum = 0;
     int curBlock[BLOCKSIZE], freeBlock[BLOCKSIZE];
 
     // Read superblock
-    status = readBlock(diskNum, 0, curBlock);
+    int status = readBlock(diskNum, 0, curBlock);
     if (status < 0) {
         return status;
     }
@@ -187,7 +187,7 @@ int get_file_idx(fileDescriptor fd) {
 // Return the disk number on success or error code on failure
 int tfs_mkfs(char *filename, int nBytes) {
     // Init variables
-    int i, status;
+    int i;
     int freeBlocks[NUM_BLOCKS - 1];
     for (i = 1; i < NUM_BLOCKS; i++) {
         freeBlocks[i - 1] = i;
@@ -203,7 +203,7 @@ int tfs_mkfs(char *filename, int nBytes) {
     int superblock[BLOCKSIZE];
     create_block(superblock, SUPERBLOCK, 0, NULL, 0);
     // Write superblock to the disk
-    status = writeBlock(diskNum, 0, superblock);
+    int status = writeBlock(diskNum, 0, superblock);
     if (status < 0) {
         return ERR_WBLOCKISSUE;
     }
@@ -378,6 +378,9 @@ fileDescriptor tfs_openFile(char *name) {
             return (status);
         }
 
+        // Set the file's block number in the resource table
+        file->blockNum = buffer[0];
+
         // PRINT TESTING
         printf("Created file with inode: %d, name: %s, fd: %d, blockNum: %d\n\n",
         file->inode, file->name, file->fd, file->blockNum);
@@ -391,7 +394,7 @@ fileDescriptor tfs_openFile(char *name) {
     return file->fd;
 }
 
-// Close a file
+// Close a file and remove it from the resource table
 // Return 0 on success or error code on failure
 int tfs_closeFile(fileDescriptor FD) {
     // Init variables
@@ -418,10 +421,12 @@ int tfs_closeFile(fileDescriptor FD) {
     return ERR_NOFILE;
 }
 
+// Write data of size from the buffer into a file, overwriting previous data and update the inode block
+// Returns 0 on success and error code on failure
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     // Init variables
-    int status, curSize, i = 0;
-    int curBlock[BLOCKSIZE];
+    int curSize, i = 0;
+    int curBlock[BLOCKSIZE], superblock[BLOCKSIZE], curDataBlocks[NUM_BLOCKS - 2];
 
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
@@ -431,12 +436,25 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     // Set the file pointer to 0
     resourceTable[idx]->filePointer = 0;
 
-    // Get the file's current data blocks
-    int curDataBlocks[NUM_BLOCKS - 2];
-    status = readBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
+    // Get the file's inode block
+    int status = readBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
     if (status < 0) {
         return status;
     }
+
+    // Get the superblock
+    status = readBlock(curDisk, 0, superblock);
+
+    // Update inode block
+    curBlock[2] = superblock[2];
+    while (curBlock[i]) {
+        i++;
+    }
+    curBlock[++i] = size;
+
+    // Write the new inode block
+    writeBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
+
     // Iterate through each data block to get their block numbers and total number of blocks
     while (curBlock[2]) {
         curDataBlocks[i++] = curBlock[2];
@@ -489,9 +507,38 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     return 0;
 }
 
+// Set a file's blocks in the disk to free
+// Return 0 on success or error code on failure
 int tfs_deleteFile(fileDescriptor FD) {
-    // Set all file's blocks to empty (including inode)
-    // Add empty blocks to the free block list
+    // Init variables
+    int i = 0;
+    int fileBlocks[NUM_BLOCKS - 1], curBlock[BLOCKSIZE];
+    
+    // Get the resource table index of the open file
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return idx;
+    }
+
+    // Add the inode block to the file blocks list
+    fileBlocks[i++] = resourceTable[idx]->blockNum;
+
+    // Get the inode block
+    int status = readBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
+    if (status < 0) {
+        return status;
+    }
+
+    // Get every data block
+    while (curBlock[2]) {
+        status = readBlock(curDisk, curBlock[2], curBlock);
+        fileBlocks[i++] = curBlock[2];
+    }
+
+    // Free file's blocks
+    fbc_set(curDisk, i, fileBlocks);
+
+    // Finished successfully
     return 0;
 }
 
@@ -548,10 +595,25 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
     // Increment file pointer
     resourceTable[idx]->filePointer++;
 
-    // Return 0 on success
+    // Finished successfully
     return 0;
 }
 
+// Change the file pointer location to the offset (absolute)
+// Return 0 on success or error code on failure
 int tfs_seek(fileDescriptor FD, int offset) {
+    // Init variables
+    int i;
+
+    // Get the resource table index of the open file
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return idx;
+    }
+
+    // Change the file pointer location
+    resourceTable[idx]->filePointer = offset;
+
+    // Finished successfully
     return 0;
 }
