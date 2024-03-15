@@ -32,7 +32,7 @@ int openDisk(char *filename, int nBytes) {
     /* Opens file + designates first nBytes as space for emulated disk */
     if (nBytes == 0) {    
         /* Opens existing file and its contents may not be overwritten */
-        file = fopen(filename, "w+"); 
+        file = fopen(filename, "r"); 
         
         if (file == NULL) {    /* confirming that the file actually was opened */
             return ERR_NOFILE; 
@@ -83,9 +83,8 @@ int openDisk(char *filename, int nBytes) {
 
         int amount = nBytes;
         if (nBytes % BLOCKSIZE != 0) {
-            // THIS IS THE SAME AS amount = nBytes
             /* if nbytes not multiple of blocksize then set it to the closest multiple */
-            amount = nBytes / BLOCKSIZE * BLOCKSIZE;
+            amount = (nBytes / BLOCKSIZE + 1) * BLOCKSIZE;
         } 
 
         /* Add new disk to linked list */

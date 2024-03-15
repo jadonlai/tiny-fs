@@ -237,7 +237,7 @@ int tfs_mount(char *diskname) {
     }
 
     // Open disk
-    int diskNum = openDisk(diskname, 0);
+    int diskNum = openDisk(diskname, DEFAULT_DISK_SIZE * BLOCKSIZE);
     if (diskNum < 0) {
         return diskNum;
     }
@@ -292,13 +292,6 @@ int tfs_unmount(void) {
 
 // Create or open a file for "rw"
 // Return a file descriptor on success or error code on failure
-/* Steps: 
-1. Create the file's details and add it to the resource table
-2. Update the resource table pointer
-3. If the file doesn't exist, do:
-    4. Create an inode block
-    5. Update the free block list pointer in the superblock
-    6. Write the inode block to the disk at the previous free block list pointer */
 fileDescriptor tfs_openFile(char *name) {
     // Init variables
     int i, status, startBlock = 0, fileExists = 0;
@@ -427,64 +420,72 @@ int tfs_closeFile(fileDescriptor FD) {
 
 int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     // Init variables
-    int status, emptyBlocks = 0;
+    int status, curSize, i = 0;
+    int curBlock[BLOCKSIZE];
 
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
     if (idx < 0) {
         return idx;
     }
+    // Set the file pointer to 0
+    resourceTable[idx]->filePointer = 0;
 
-    // Number of blocks needed
-    int numBlocks = floor(size / DATASIZE);
-    if (size % DATASIZE != 0) {
-        numBlocks++;
-    }
-
-    // Number of empty blocks
-
-    // Read the superblock
-    int curBlock[BLOCKSIZE];
-    status = readBlock(curDisk, 0, curBlock);
-    if (status < 0) {
-        return status;
-    }
-    // Read every empty block in the empty block chain
-    while (curBlock[2]) {
-        emptyBlocks++;
-        status = readBlock(curDisk, curBlock[2], curBlock);
-        if (status < 0) {
-            return status;
-        }
-    }
-    // Add the file's blocks that we're going to overwrite to the number of empty blocks
-    // Read inode block
+    // Get the file's current data blocks
+    int curDataBlocks[NUM_BLOCKS - 2];
     status = readBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
     if (status < 0) {
         return status;
     }
-    // Read every file extent block
+    // Iterate through each data block to get their block numbers and total number of blocks
     while (curBlock[2]) {
-        emptyBlocks++;
+        curDataBlocks[i++] = curBlock[2];
         status = readBlock(curDisk, curBlock[2], curBlock);
         if (status < 0) {
             return status;
-        } else if (curBlock[0] != FILEEXTENT) {
-            return ERR_BLOCKFORMAT;
         }
     }
 
+    // Free the file's current data blocks
+    fbc_set(curDisk, i, curDataBlocks);
+
+    // Number of blocks needed
+    int numBlocks = ceil(size / DATASIZE);
+    int freeBlocks[numBlocks];
+
+    // Get next free blocks
+    status = fbc_get(numBlocks, freeBlocks);
+    if (status < 0) {
+        return status;
+    }
+
+    // Create and write all file extent blocks
+    int dataBuffer[DATASIZE];
+    for (i = 0; i < numBlocks; i++) {
+        // Copy data of size DATASIZE to buffer to write to the disk
+        if (i != numBlocks - 1) {
+            curSize = DATASIZE;
+        } else {
+            curSize = size % DATASIZE;
+        }
+        memcpy(dataBuffer, &buffer[i * DATASIZE], curSize);
+
+        // Create the file extent block
+        if (i != numBlocks - 1) {
+            create_block(curBlock, FILEEXTENT, freeBlocks[i + 1], dataBuffer, curSize);
+        } else {
+            create_block(curBlock, FILEEXTENT, 0, dataBuffer, curSize);
+        }
+
+        // Write the file extent block
+        writeBlock(curDisk, freeBlocks[i], curBlock);
+    }
+
     // PRINT TESTING
-    printf("Trying to write %d blocks with %d empty blocks\n", numBlocks, emptyBlocks);
+    printf("Writing %d blocks\n", numBlocks);
+    printf("Data: %s\n\n", buffer);
 
-    // Ensure that there's enough empty blocks to write the file
-
-    // Set all file's blocks to empty (not inode)
-    // See how many blocks are needed
-    // See how many empty blocks there are
-    // If there are enough empty blocks, write the file
-    // Set the file pointer to 0
-    printf("test\n");
+    // Finished successfully
     return 0;
 }
 
@@ -497,9 +498,6 @@ int tfs_deleteFile(fileDescriptor FD) {
 // Read a byte into the given buffer from a file at its pointer and increment the pointer
 // Return 0 on success or error code on failure
 int tfs_readByte(fileDescriptor FD, char *buffer) {
-    // Init variables
-    int i, status, size, blockNum, offset;
-
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
     if (idx < 0) {
@@ -508,26 +506,26 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
 
     // Read inode block
     int block[BLOCKSIZE];
-    status = readBlock(curDisk, resourceTable[idx]->blockNum, block);
+    int status = readBlock(curDisk, resourceTable[idx]->blockNum, block);
     if (status < 0) {
         return status;
     }
 
     // Get the size of the data
-    i = 4;
+    int i = 4;
     while (block[i]) {
         i++;
     }
-    size = block[++i];
+    int size = block[++i];
 
     // Check that file pointer is within range
-    if (resourceTable[idx]->filePointer >= size) {
+    if (resourceTable[idx]->filePointer >= size || resourceTable[idx]->filePointer < 0) {
         return ERR_RSEEKISSUE;
     }
 
     // Set the block number and offset
-    blockNum = floor(resourceTable[idx]->filePointer / DATASIZE);
-    offset = resourceTable[idx]->filePointer % DATASIZE;
+    int blockNum = floor(resourceTable[idx]->filePointer / DATASIZE);
+    int offset = resourceTable[idx]->filePointer % DATASIZE;
 
     // Get to the right block
     for (i = 0; i < blockNum; i++) {
@@ -546,7 +544,6 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
     // PRINT TESTING
     printf("Read byte %c from file %s\n", *buffer, resourceTable[idx]->name);
     printf("File pointer moved from %d to %d\n\n", resourceTable[idx]->filePointer - 1, resourceTable[idx]->filePointer);
-    pause();
 
     // Increment file pointer
     resourceTable[idx]->filePointer++;
@@ -556,9 +553,5 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
 }
 
 int tfs_seek(fileDescriptor FD, int offset) {
-    // Change the file pointer location
-    if (offset > BLOCKSIZE - 1) {
-        return ERR_WSEEKISSUE;
-    }
     return 0;
 }
