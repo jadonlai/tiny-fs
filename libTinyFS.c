@@ -16,7 +16,7 @@ int resourceTablePointer = 0;
 void print_disk(int diskNum) {
     int i;
     int block[BLOCKSIZE];
-    printf("\nDISK\n-------------------------\n");
+    printf("\nDISK %d\n-------------------------\n", diskNum);
     for (i = 0; i < NUM_BLOCKS; i++) {
         readBlock(diskNum, i, block);
         printf("type: %d, link: %d\n", block[0], block[2]);
@@ -136,6 +136,11 @@ int fbc_set(int diskNum, int num, int* buffer) {
             return status;
         }
     }
+
+    print_disk(0);
+    print_disk(1);
+    print_disk(2);
+    print_disk(3);
 
     // Finished successfully
     return 0;
@@ -602,9 +607,6 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
 // Change the file pointer location to the offset (absolute)
 // Return 0 on success or error code on failure
 int tfs_seek(fileDescriptor FD, int offset) {
-    // Init variables
-    int i;
-
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
     if (idx < 0) {
