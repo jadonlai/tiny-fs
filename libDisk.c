@@ -3,7 +3,7 @@
 #include "TinyFS_errno.h"
 
 Disk *head = NULL;
-int diskCount;
+int diskCount = 0;
 
 /* THIS SHOULD BE DELETED */
 void printDiskList(Disk *head) {
@@ -46,8 +46,8 @@ int openDisk(char *filename, int nBytes) {
 
             /* getting size of file */
             fseek(file, 0, SEEK_END);   /* seeking to end of file*/
-            int size = (int)ftell(file);
-            int diskSize = ((size/BLOCKSIZE) + 1) * BLOCKSIZE; 
+            int size = (int) ftell(file);
+            int diskSize = ((size / BLOCKSIZE) + 1) * BLOCKSIZE; 
             fseek(file, 0, SEEK_SET);   /* seek to the front */
 
             if(addDiskNode(diskNumber, diskSize, filename, file)) {
@@ -84,8 +84,8 @@ int openDisk(char *filename, int nBytes) {
         int amount = nBytes;
         if (nBytes % BLOCKSIZE != 0) {
             /* if nbytes not multiple of blocksize then set it to the closest multiple */
-            amount = nBytes / BLOCKSIZE * BLOCKSIZE;
-        } 
+            amount = (nBytes / BLOCKSIZE + 1) * BLOCKSIZE;
+        }
 
         /* Add new disk to linked list */
         if(addDiskNode(diskNumber, amount, filename, file)) {
@@ -103,17 +103,17 @@ int openDisk(char *filename, int nBytes) {
 int addDiskNode(int diskNum, int diskSize, char *filename, FILE* file) {
 
     /* make disk Node for new disk */ 
-    Disk *new_disk = (Disk *)malloc(sizeof(Disk));
+    Disk *new_disk = (Disk *) malloc(sizeof(Disk));
     if (new_disk == NULL) {
         return ERR_ADDDISK;
     }
 
     new_disk->diskNumber = diskNum; 
     new_disk->diskSize = diskSize; 
-    new_disk->status = 1; /* open status */
+    new_disk->status = OPEN; /* open status */
 
     /* copy string into node */
-    new_disk->fileName = (char *)malloc((strlen(filename) + 1) * sizeof(char));
+    new_disk->fileName = (char *) malloc((strlen(filename) + 1) * sizeof(char));
     if (new_disk->fileName == NULL) {
         free(new_disk); 
         return ERR_ADDDISK;
@@ -238,13 +238,13 @@ int readBlock(int disk, int bNum, void *block) {
 
     /* Check that block is the size of a BLOCKSIZE  */ 
     if ((block != NULL && sizeof(block) >= 256) || block == NULL) {
-    return ERR_RBLOCKISSUE;
+        return ERR_RBLOCKISSUE;
     }
 
     int startByte = bNum * BLOCKSIZE;
 
     /*  Check that startByte + BLOCKSIZE is not greater than the size of the file */
-    if (startByte + BLOCKSIZE >= wanted_disk->diskSize) {
+    if (startByte + BLOCKSIZE > wanted_disk->diskSize) {
         return ERR_RPASTLIMIT;
     }
 
@@ -280,7 +280,7 @@ int writeBlock(int disk, int bNum, void *block) {
 
     int startByte = bNum * BLOCKSIZE;
     /*  Check that startByte + BLOCKSIZE is not greater than the size of the file */
-    if (startByte + BLOCKSIZE >= wanted_disk->diskSize) {
+    if (startByte + BLOCKSIZE > wanted_disk->diskSize) {
         return ERR_RPASTLIMIT;
     }
     
