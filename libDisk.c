@@ -97,6 +97,7 @@ int openDisk(char *filename, int nBytes) {
                 return ERR_FINDANDCHANGESTATUS;
             }
 
+            chosen_disk->diskSize = amount;
             /* update the FILE pointer in our node */
             if (updateDiskFile(file, diskNumber) < 0) {
                 return ERR_CANNOTFNDDISK;
