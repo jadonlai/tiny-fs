@@ -89,6 +89,7 @@ int openDisk(char *filename, int nBytes) {
 
         /* Check if entry exists and if it does not we may have to make a new one */
         Disk *chosen_disk = findDiskNodeFileName(filename); 
+
         if (chosen_disk) { 
             /* Find the disk entry in list with filename and set it to open */
             diskNumber = changeDiskStatusFileName(filename, OPEN);

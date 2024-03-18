@@ -212,6 +212,8 @@ int tfs_mkfs(char *filename, int nBytes) {
 
     // Make a disk on the file
     int diskNum = openDisk(filename, nBytes);
+    printf("%d\n", diskNum);
+    
     if (diskNum < 0) {
         return ERR_NOFILE;
     }
