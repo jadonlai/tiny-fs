@@ -90,10 +90,17 @@ int openDisk(char *filename, int nBytes) {
         /* Check if entry exists and if it does not we may have to make a new one */
         Disk *chosen_disk = findDiskNodeFileName(filename); 
         if (chosen_disk) { 
-            /* if opening disk that already exists update node! */
-            diskNumber = chosen_disk->diskNumber; 
-            chosen_disk->file = file;
-            chosen_disk->diskSize = amount;
+            /* Find the disk entry in list with filename and set it to open */
+            diskNumber = changeDiskStatusFileName(filename, OPEN);
+            if (diskNumber < 0) {   /* if error */
+                return ERR_FINDANDCHANGESTATUS;
+            }
+
+            /* update the FILE pointer in our node */
+            if (updateDiskFile(file, diskNumber) < 0) {
+                return ERR_CANNOTFNDDISK;
+            }  
+
         } else {
              /* Add new disk to linked list */
             if(addDiskNode(diskNumber, amount, filename, file)) {
