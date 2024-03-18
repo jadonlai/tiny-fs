@@ -75,7 +75,12 @@ int openDisk(char *filename, int nBytes) {
         return ERR_NOFILE;
     } else {
         /* Already file given by filename, the file's content may be overwritten */
-        file = fopen(filename, "w+");
+        if (access(filename, F_OK) == -1) {
+            /* file doesn't exist we open it */
+            file = fopen(filename, "w+");
+        } else { /* if file exists let us read and write it from it and don't truncate */
+            file = fopen(filename, "r+");
+        }
 
         if (file == NULL) {    /* confirming that the file actually was opened */
             return ERR_NOFILE; 
@@ -98,11 +103,11 @@ int openDisk(char *filename, int nBytes) {
             }
 
             chosen_disk->diskSize = amount;
+
             /* update the FILE pointer in our node */
             if (updateDiskFile(file, diskNumber) < 0) {
                 return ERR_CANNOTFNDDISK;
             }  
-
         } else {
              /* Add new disk to linked list */
             if(addDiskNode(diskNumber, amount, filename, file)) {
@@ -272,6 +277,7 @@ int readBlock(int disk, int bNum, void *block) {
 
     /* Read the BLOCKSIZE into block */
     size_t bytesRead = fread(block, 1, BLOCKSIZE, file);
+
     if (bytesRead != BLOCKSIZE) {
         return ERR_READISSUE;
     }

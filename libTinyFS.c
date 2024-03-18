@@ -255,7 +255,7 @@ int tfs_mount(char *diskname) {
     printf("tfs_mount\n");
 
     // Open disk
-    int diskNum = openDisk(diskname, 0);
+    int diskNum = openDisk(diskname, DEFAULT_DISK_SIZE);
     if (diskNum < 0) {
         return diskNum;
     }
@@ -267,6 +267,7 @@ int tfs_mount(char *diskname) {
         // Read block
         status = readBlock(diskNum, i, block);
         if (status < 0) {
+            closeDisk(diskNum);  
             return status;
         }
         // Check the superblock
@@ -278,6 +279,7 @@ int tfs_mount(char *diskname) {
         }
         // Check the magic number
         if (block[1] != MAGIC) {
+            closeDisk(diskNum);
             return ERR_BLOCKFORMAT;
         }
     }
