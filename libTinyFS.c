@@ -234,6 +234,12 @@ int tfs_mkfs(char *filename, int nBytes) {
     // Set to the current disk
     curDisk = diskNum;
 
+    // Close the disk
+    status = closeDisk(diskNum);
+    if (status < 0) {
+        return status;
+    }
+
     // Return the disk number on success
     return diskNum;
 }
@@ -246,19 +252,11 @@ int tfs_mount(char *diskname) {
 
     printf("tfs_mount\n");
 
-    // Ensure that there's not already a disk mounted
-    // if (curDisk != -1) {
-    //     return ERR_MOUNTMULTIPLE;
-    // }
-
     // Open disk
     int diskNum = openDisk(diskname, 0);
     if (diskNum < 0) {
         return diskNum;
     }
-    //int diskNum = curDisk;
-    /* MOUNT SHOULD BE ABLE TO MOUNT A DISK FROM A PREVIOUSLY CREATED FILE */
-    /* SO WE DON'T HAVE TO CREATE A DISK IF TINYFSDISK IS ALREADY MADE */
 
     // Ensure that file system is formatted correctly
     int block[BLOCKSIZE];
@@ -383,7 +381,6 @@ fileDescriptor tfs_openFile(char *name) {
         create_block(inodeBlock, INODE, 0, inodeData, ++i);
         status = writeBlock(curDisk, buffer[0], inodeBlock);
         if (status < 0) {
-            printf("%d err\n", status);
             free(file);
             return (status);
         }
