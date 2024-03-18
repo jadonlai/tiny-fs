@@ -87,12 +87,20 @@ int openDisk(char *filename, int nBytes) {
             amount = (nBytes / BLOCKSIZE + 1) * BLOCKSIZE;
         }
 
-        /* Add new disk to linked list */
-        if(addDiskNode(diskNumber, amount, filename, file)) {
-            return ERR_ADDDISK;
+        /* Check if entry exists and if it does not we may have to make a new one */
+        Disk *chosen_disk = findDiskNodeFileName(filename); 
+        if (chosen_disk) { 
+            /* if opening disk that already exists update node! */
+            diskNumber = chosen_disk->diskNumber; 
+            chosen_disk->file = file;
+            chosen_disk->diskSize = amount;
+        } else {
+             /* Add new disk to linked list */
+            if(addDiskNode(diskNumber, amount, filename, file)) {
+                return ERR_ADDDISK;
+            }
+            diskCount = diskCount + 1;    /* incrementing diskCount for next disk */
         }
-
-        diskCount = diskCount + 1;    /* incrementing diskCount for next disk */
     }
 
     /* Return disk number of disk we just were dealing with*/
