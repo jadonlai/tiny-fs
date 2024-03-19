@@ -31,8 +31,8 @@ int fillBufferWithPhrase(char *inPhrase, char *Buffer, int size) {
 int main() {
   char readBuffer;
   char *afileContent, *bfileContent;	/* buffers to store file content */
-  int afileSize = 200;		            /* sizes in bytes */
-  int bfileSize = 1000;
+  int afileSize = 30;		            /* sizes in bytes */
+  int bfileSize = 500;
 
   char phrase1[] = "hello world from (a) file ";
   char phrase2[] = "(b) file content ";
@@ -85,8 +85,14 @@ int main() {
     }
   } else {
     /* if yes, then just read and print the rest of afile that was already there */
-    printf("\n*** reading afile from TinyFS:\n%c", readBuffer);  /* print the first byte already read */
+    printf("\n*** reading afile from TinyFS:\n%c\n", readBuffer);  /* print the first byte already read */
+    /* write a new byte */
+    printf("\nwriting byte: 9\n\n");
+    tfs_writeByte(aFD, 57);
+    /* move the pointer back */
+    tfs_seek(aFD, 1);
     /* now print the rest of it, byte by byte */
+    printf("reading again:\n");
     while (tfs_readByte(aFD, &readBuffer) >= 0)  /* go until readByte fails */
 	    printf("%c", readBuffer);
     /* close file */
@@ -120,6 +126,10 @@ int main() {
     }
   } else {
     printf("\n*** reading bfile from TinyFS:\n%c", readBuffer);
+    printf("\nwriting byte: 9\n\n");
+    tfs_writeByte(bFD, 57);
+    tfs_seek(bFD, 1);
+    printf("reading again:\n");
     while (tfs_readByte(bFD, &readBuffer) >= 0)
 	    printf("%c", readBuffer);
   }

@@ -17,3 +17,4 @@
 #define ERR_FILENAMELIMIT -17
 #define ERR_OUTOFBOUNDS -18
 #define ERR_TIMING -19
+#define ERR_READONLY -20
