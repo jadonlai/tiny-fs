@@ -347,6 +347,66 @@ int tfs_unmount(void) {
     return 0;
 }
 
+int tfs_readdir(){
+    int i;
+    printf("\nFile Names:\n");
+    for (i = 0; i < NUM_BLOCKS - 1; i++) { // actually need to iterate through the disk not the resource table
+        if (resourceTable[i]) {
+            printf("%s\n", resourceTable[i]->name);
+        }
+    }
+    return 0;
+}
+
+
+int tfs_rename(fileDescriptor FD, char* newName) {
+
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return idx;
+    }
+
+    char* oldName = resourceTable[idx]->name;
+    int i, j = 0, x, status;
+
+    char curBlock[BLOCKSIZE];
+    for (i = 1; i < NUM_BLOCKS - 1; i++) {
+        // Read block
+        status = readBlock(curDisk, i, curBlock);
+        // Check if block is an inode block and if it's the file we're looking for
+        if (curBlock[0] == INODE) {
+            // Copy file name
+            char *fname = malloc(sizeof(char) * (MAXNAMECHARS + 1));
+            while (curBlock[4 + j]) {
+                fname[j] = curBlock[4 + j];
+                j++;
+            }
+            fname[j] = 0;
+            j = 0;
+
+            // If file exists replace the name
+            // maxSize 6
+            // make charPtr
+            if (strcmp(fname, oldName) == 0) { // see if fd in rt if not then return (not open)
+                x = 0;
+                size_t nameLen = strlen(newName);
+                while (x < nameLen) {
+                    curBlock[4 + x] = newName[x];
+                    x++;
+                }
+                curBlock[4 + x] = 0;
+                resourceTable[idx]->name = newName;
+                break;
+            }
+        }
+    }
+    return status;
+}
+
+
+
+
+
 // Create or open a file for "rw"
 // Return a file descriptor on success or error code on failure
 fileDescriptor tfs_openFile(char *name) {

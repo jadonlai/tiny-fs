@@ -42,3 +42,5 @@ extern int updateModificationTime(fileDescriptor FD);
 extern int updateAccessTime(fileDescriptor FD);
 void printTimes(fileDescriptor FD);
 
+int tfs_rename(fileDescriptor FD, char* newName);
+int tfs_readdir();

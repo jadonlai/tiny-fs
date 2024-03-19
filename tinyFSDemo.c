@@ -68,6 +68,14 @@ int main() {
   /* read or write files to TinyFS */
   aFD = tfs_openFile("afile");
 
+  // Validate rename
+  tfs_readdir();
+  int rename = tfs_rename(aFD, "testabc");
+  if(rename < 0){
+      perror("tfs_rename failed on rename");
+  }
+  tfs_readdir();
+
   if (aFD < 0) {
     perror("tfs_openFile failed on afile");
   }
