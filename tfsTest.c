@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "tinyFS.h"
 #include "libTinyFS.h"
@@ -72,6 +73,11 @@ int main() {
     perror("tfs_openFile failed on afile");
   }
 
+
+  printf("\nAFile Post Creating\n");
+  printTimes(aFD);
+  sleep(1);
+
   /* now, was there already a file named "afile" that had some content? If we can read from it, yes!
    * If we can't read from it, it presumably means the file was empty.
    * If the size is 0 (all new files are sized 0) then any "readByte()" should fail, so 
@@ -81,6 +87,8 @@ int main() {
     if (tfs_writeFile(aFD, afileContent, afileSize) < 0) {
 	    perror("tfs_writeFile failed");
 	  } else {
+      printf("\nAFile Post Writing\n");
+      printTimes(aFD);
 	    printf("Successfully written to afile\n");
     }
   } else {
@@ -89,6 +97,9 @@ int main() {
     /* now print the rest of it, byte by byte */
     while (tfs_readByte(aFD, &readBuffer) >= 0)  /* go until readByte fails */
 	    printf("%c", readBuffer);
+
+    printf("\nAFile Post Reading\n");
+    printTimes(aFD);
 
     /* close file */
     if (tfs_closeFile (aFD) < 0)
@@ -106,15 +117,21 @@ int main() {
 
   /* now bfile tests */
   bFD = tfs_openFile("bfile");
+  sleep(1);
 
   if (bFD < 0) {
     perror ("tfs_openFile failed on bfile");
   }
 
+  printf("\nBFile Just Opened\n");
+  printTimes(bFD);
+
   if (tfs_readByte(bFD, &readBuffer) < 0) {
     if (tfs_writeFile(bFD, bfileContent, bfileSize) < 0) {
 	    perror("tfs_writeFile failed");
 	  } else {
+      printf("\nBFile Post Writing\n");
+      printTimes(bFD);
 	    printf("Successfully written to bfile\n");
     }
   } else {
@@ -122,14 +139,19 @@ int main() {
     while (tfs_readByte(bFD, &readBuffer) >= 0)
 	    printf("%c", readBuffer);
 
+    printf("\nBFile Post Reading\n");
+    printTimes(aFD);
     tfs_deleteFile(bFD);
   }
+
 
   /* Free both content buffers */
   free(bfileContent);
   free(afileContent);
   if (tfs_unmount() < 0)
     perror ("tfs_unmount failed");
+
+
 
   printf ("\nend of demo\n\n");
   return 0;

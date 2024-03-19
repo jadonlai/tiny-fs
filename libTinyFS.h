@@ -1,5 +1,5 @@
 #include "tinyFS.h"
-
+#include <time.h>
 
 
 #define SUPERBLOCK 1
@@ -13,12 +13,16 @@
 #define READWRITE 3
 #define NUM_BLOCKS 40
 #define MAXNAMECHARS 8
+#define MAXTIMESTRING 26
 
 typedef struct FileDetails {
     int inode;
     char *name;
     fileDescriptor fd;
     int filePointer;
+    time_t creationTime; 
+    time_t accessTime; 
+    time_t modificationTime;
 } FileDetails;
 
 extern int tfs_mkfs(char *filename, int nBytes);
@@ -31,3 +35,10 @@ extern int tfs_deleteFile(fileDescriptor FD);
 extern int tfs_readByte(fileDescriptor FD, char *buffer);
 extern int tfs_seek(fileDescriptor FD, int offset);
 extern void tfs_displayFragments();
+extern time_t tfs_getCreationTime(fileDescriptor FD);
+extern time_t getFileAccessTime(fileDescriptor FD);
+extern time_t getFileModificationTime(fileDescriptor FD);
+extern int updateModificationTime(fileDescriptor FD);
+extern int updateAccessTime(fileDescriptor FD);
+void printTimes(fileDescriptor FD);
+
