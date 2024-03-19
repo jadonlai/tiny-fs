@@ -393,9 +393,7 @@ fileDescriptor tfs_openFile(char *name) {
     FileDetails *file = malloc(sizeof(FileDetails));
     file->inode = startBlock;
     file->name = name;
-    file->fd = resourceTablePointer;
     file->filePointer = 0;
-    file->blockNum = startBlock;
 
     // Add file to resource table
     resourceTable[resourceTablePointer] = file;
