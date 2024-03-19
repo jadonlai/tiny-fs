@@ -393,6 +393,7 @@ fileDescriptor tfs_openFile(char *name) {
     FileDetails *file = malloc(sizeof(FileDetails));
     file->inode = startBlock;
     file->name = name;
+    file->fd = resourceTablePointer;
     file->filePointer = 0;
 
     // Add file to resource table
@@ -729,6 +730,7 @@ int tfs_defrag() {
     // Finished successfully
     return 0;
 }
+
 /* get creation time of file */
 time_t tfs_getCreationTime(fileDescriptor FD)  {
     // Get the resource table index of the open file
