@@ -31,4 +31,4 @@ tfsTest: tfsTest.o libTinyFS.o libDisk.o
 	$(CC) $(CFLAGS) -o tfsTest tfsTest.o libTinyFS.o libDisk.o
 
 clean:
-	rm libDisk.o libTinyFS.o diskTest.o tfsTest.o tinyFSDemo.o diskTest tfsTest tinyFSDemo disk0.dsk disk1.dsk disk2.dsk disk3.dsk tinyFSDisk
+	rm libDisk.o libTinyFS.o diskTest.o tfsTest.o tinyFSDemo.o diskTest tfsTest tinyFSDemo disk0.dsk disk1.dsk disk2.dsk disk3.dsk tinyFSDisk tinyFSDemoDisk

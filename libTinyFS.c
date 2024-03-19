@@ -10,6 +10,7 @@
 int curDisk = -1;
 FileDetails *resourceTable[NUM_BLOCKS - 1] = {NULL};
 int resourceTablePointer = 0;
+char *typeMap[4] = {"superblock", "inode", "file extent", "free block"};
 
 
 
@@ -23,7 +24,7 @@ void print_disk(int diskNum, int numBlocks, int dataSize) {
             perror("print_disk");
             exit(1);
         }
-        printf("num: %d, type: %d, link: %d\n", i, block[0], block[2]);
+        printf("num: %2d   |   type: %11s   |   link: %2d\n", i, typeMap[(int) block[0] - 1], block[2]);
         if (dataSize) {
             for (j = 0; j < dataSize; j++) {
                 printf("%d ", block[j]);
@@ -232,15 +233,40 @@ int get_fileSize(int idx) {
     return size;
 }
 
-// Given a filename and number of bytes, create a filesystem of size nBytes on the filename
-// Return the disk number on success or error code on failure
-int tfs_mkfs(char *filename, int nBytes) {
+// Given a diskNum, init the disk with a superblock and free blocks
+// Return 0 on success or error code on failure
+int initDisk(int diskNum) {
     // Init variables
     int i;
     int freeBlocks[NUM_BLOCKS - 1];
     for (i = 1; i < NUM_BLOCKS; i++) {
         freeBlocks[i - 1] = i;
     }
+
+    // Create the superblock
+    char superblock[BLOCKSIZE];
+    create_block(superblock, SUPERBLOCK, 0, NULL, 0);
+    // Write superblock to the disk
+    int status = writeBlock(diskNum, 0, superblock);
+    if (status < 0) {
+        return ERR_WBLOCKISSUE;
+    }
+    
+    // Write free blocks
+    status = fbc_set(diskNum, NUM_BLOCKS - 1, freeBlocks);
+    if (status < 0) {
+        return status;
+    }
+
+    // Finished successfully
+    return 0;
+}
+
+// Given a filename and number of bytes, create a filesystem of size nBytes on the filename
+// Return the disk number on success or error code on failure
+int tfs_mkfs(char *filename, int nBytes) {
+    // Init variables
+    int i;
 
     // PRINT TESTING
     // printf("tfs_mkfs\n");
@@ -257,17 +283,8 @@ int tfs_mkfs(char *filename, int nBytes) {
         writeBlock(diskNum, i, emptyBlock);
     }
 
-    // Create the superblock
-    char superblock[BLOCKSIZE];
-    create_block(superblock, SUPERBLOCK, 0, NULL, 0);
-    // Write superblock to the disk
-    int status = writeBlock(diskNum, 0, superblock);
-    if (status < 0) {
-        return ERR_WBLOCKISSUE;
-    }
-    
-    // Write free blocks
-    status = fbc_set(diskNum, NUM_BLOCKS - 1, freeBlocks);
+    // Init the disk blocks
+    int status = initDisk(diskNum);
     if (status < 0) {
         return status;
     }
@@ -394,7 +411,6 @@ fileDescriptor tfs_openFile(char *name) {
     file->name = name;
     file->fd = resourceTablePointer;
     file->filePointer = 0;
-    file->blockNum = startBlock;
 
     // Add file to resource table
     resourceTable[resourceTablePointer] = file;
@@ -616,8 +632,8 @@ int tfs_deleteFile(fileDescriptor FD) {
 
     // Get every data block
     while (curBlock[2]) {
-        status = readBlock(curDisk, curBlock[2], curBlock);
         fileBlocks[i++] = curBlock[2];
+        status = readBlock(curDisk, curBlock[2], curBlock);
     }
 
     // Free file's blocks
@@ -714,6 +730,78 @@ int tfs_seek(fileDescriptor FD, int offset) {
 
     // Change the file pointer location
     resourceTable[idx]->filePointer = offset;
+
+    // Finished successfully
+    return 0;
+}
+
+// Display a map of the free and occupied blocks in the disk
+void tfs_displayFragments() {
+    print_disk(curDisk, 40, 0);
+}
+
+// Move all the blocks so that the free blocks are continuous at the end of the disk
+// Return 0 on success or error code on failure
+int tfs_defrag() {
+    // Init variables
+    int i, status, pointer = 0;
+    char blockList[NUM_BLOCKS][256];
+    char block[BLOCKSIZE];
+
+    // Iterate through every block and save the inode/file extent blocks
+    for (i = 0; i < NUM_BLOCKS; i++) {
+        // Read the block
+        status = readBlock(curDisk, i, block);
+        if (status < 0) {
+            return status;
+        }
+
+        // Check if an inode block
+        if (block[0] == INODE) {
+            // Add it to the block list
+            memcpy(blockList[pointer++], block, BLOCKSIZE);
+
+            // Iterate through file extent blocks
+            while (block[2]) {
+                // Read file extent block
+                status = readBlock(curDisk, block[2], block);
+                if (status < 0) {
+                    return status;
+                }
+
+                // Add it to the block list
+                memcpy(blockList[pointer++], block, BLOCKSIZE);
+            }
+        }
+    }
+
+    // Reinit the disk
+    status = initDisk(curDisk);
+    if (status < 0) {
+        return status;
+    }
+
+    // Get the number of free blocks we need to set
+    int buffer[pointer];
+    status = fbc_get(pointer, buffer);
+    if (status < 0) {
+        return status;
+    }
+
+    // Create and write every inode/file extent block to the disk
+    for (i = 0; i < pointer; i++) {
+        // Next block is an inode block or it's the last file extent block, set the link to 0
+        if (blockList[i + 1][0] == INODE || i == pointer - 1) {
+            blockList[i][2] = 0;
+        } else {
+            blockList[i][2] = i + 2;
+        }
+        // Write the block to the disk
+        status = writeBlock(curDisk, i + 1, blockList[i]);
+        if (status < 0) {
+            return status;
+        }
+    }
 
     // Finished successfully
     return 0;

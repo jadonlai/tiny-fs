@@ -34,6 +34,8 @@ extern int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
 extern int tfs_deleteFile(fileDescriptor FD);
 extern int tfs_readByte(fileDescriptor FD, char *buffer);
 extern int tfs_seek(fileDescriptor FD, int offset);
+extern void tfs_displayFragments();
+extern int tfs_defrag();
 extern time_t tfs_getCreationTime(fileDescriptor FD);
 extern time_t getFileAccessTime(fileDescriptor FD);
 extern time_t getFileModificationTime(fileDescriptor FD);
