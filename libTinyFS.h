@@ -20,7 +20,6 @@ typedef struct FileDetails {
     char *name;
     fileDescriptor fd;
     int filePointer;
-    int blockNum;
     time_t creationTime; 
     time_t accessTime; 
     time_t modificationTime;
