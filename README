@@ -1,3 +1,29 @@
+○ Names of all the partners
 Jadon Lai, Mira Shlimenzon, Sarah Hallam
 
-Additional Functionality: 
+○ An explanation of how well your TinyFS implementation works, including tradeoffs
+you made and why
+For our set-up of converting a stereotypical file to a disk (libDisk.c), what we did is we needed to implement a linked list structure
+to maintain crucial information about each disk such as file pointer, filename of the disk, disk status, and disk size. This choice left
+us needing to constantly go into the linked list and follow the `next` pointer to find each needed disk. This process was necessary because 
+at runtime we don't know how much disks will be opened and we needed a structure that could grow as needed. Thankfully, for our demo,
+we are only using one disk: tinyFSDemo. Therefore, this tradeoff is not as important.
+
+``jadon write about your tinyfs implementation here``
+
+
+○ An explanation of which additional functionality areas you have chosen and how
+you have shown that it works.
+For our TinyFS implementation, we added additional functionality in four different areas: timestamps, 
+read-only and writeByte support, fragmentation info and defragmentation, and directory listing and file renaming. 
+For our timestamps, what we did is we added three new entries to our Disk struct object. Here we added current 
+time, modification time, and access time. Anytime, we would read or write into a file we would use that file descriptor
+and update its associated access time. Similarily, when we would only write to a file, we would modify its modification
+time. When a file is created, at the time of this, this is what we set as a file's creation time. We created a 
+print function that allowed us with a given file descriptor aka file print out all the file's times.  
+
+``jadon and sarah write about your tinyfs implementation here``
+
+○ Any limitations or bugs your file system has.
+We do not have any limitations or bugs in our file system. It is looking good. 
+
