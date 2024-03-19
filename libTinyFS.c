@@ -212,6 +212,7 @@ int get_file_idx(fileDescriptor fd) {
 int get_fileSize(int idx) {
     // Read inode block
     char block[BLOCKSIZE];
+
     int status = readBlock(curDisk, resourceTable[idx]->blockNum, block);
     if (status < 0) {
         return status;
@@ -395,6 +396,9 @@ fileDescriptor tfs_openFile(char *name) {
     file->fd = file->inode;
     file->filePointer = 0;
     file->blockNum = startBlock;
+    time(&(file->creationTime));
+    time(&(file->accessTime));
+    time(&(file->modificationTime));
 
     // Add file to resource table
     resourceTable[resourceTablePointer] = file;
@@ -580,6 +584,10 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
         writeBlock(curDisk, freeBlocks[i], curBlock);
     }
 
+    if(updateModificationTime(FD) != 0) {
+        return ERR_TIMING;
+    } // updating file's last type modified
+
     // Finished successfully
     return 0;
 }
@@ -677,6 +685,10 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
     // Increment file pointer
     resourceTable[idx]->filePointer++;
 
+    if(updateAccessTime(FD) != 0) {
+        return ERR_TIMING;
+    } // updating file's last type modified
+
     // Finished successfully
     return 0;
 }
@@ -709,4 +721,96 @@ int tfs_seek(fileDescriptor FD, int offset) {
 
     // Finished successfully
     return 0;
+}
+
+/* get creation time of file */
+time_t tfs_getCreationTime(fileDescriptor FD)  {
+    // Get the resource table index of the open file
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return (time_t)-1; //error time
+    }
+    if(updateAccessTime(FD) != 0) {
+        return (time_t)-1; //error time
+    } /* technically we are also accessing FD so... update it */
+    return resourceTable[idx]->creationTime;
+}
+
+/* get access time of file */
+time_t getFileAccessTime(fileDescriptor FD) {
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return (time_t)-1; //error time
+    }
+    if(updateAccessTime(FD) != 0) {
+        return (time_t)-1; //error time
+    } /* technically we are also accessing FD so... update it */
+    return resourceTable[idx]->accessTime;
+}
+
+/* get modification time */
+time_t getFileModificationTime(fileDescriptor FD) {
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return (time_t)-1; //error time
+    }
+    if(updateAccessTime(FD)!= 0) {
+        return (time_t)-1;
+    }  /* technically we are also accessing FD so... update it */
+    return resourceTable[idx]->modificationTime;
+}
+
+/* Update the time a file was modified */
+int updateModificationTime(fileDescriptor FD) {
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return idx;
+    }
+    if(updateAccessTime(FD) != 0) {
+        return -1; //error time
+    }  /* technically we are also accessing FD so... update it */
+    time(&(resourceTable[idx]->modificationTime));
+    return 0;
+}
+
+/* Updated the time a file was accessed */
+int updateAccessTime(fileDescriptor FD) {
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return idx;
+    }
+    time(&(resourceTable[idx]->accessTime));
+    return 0;
+}
+
+void printTimes(fileDescriptor FD) {
+    char strTime[MAXTIMESTRING];
+    time_t fileTime;
+
+    // Get and print the modification time
+    fileTime = getFileModificationTime(FD);
+    if (fileTime != (time_t)-1) {
+        strftime(strTime, MAXTIMESTRING, "%c", localtime(&fileTime));
+        printf("Modification Time: %s\n", strTime);
+    } else {
+        printf("Failed to get modification time\n");
+    }
+
+    // Get and print the creation time
+    fileTime = tfs_getCreationTime(FD);
+    if (fileTime != (time_t)-1) {
+        strftime(strTime, MAXTIMESTRING, "%c", localtime(&fileTime));
+        printf("Creation Time: %s\n", strTime);
+    } else {
+        printf("Failed to get creation time\n");
+    }
+
+    // Get and print the access time
+    fileTime = getFileAccessTime(FD);
+    if (fileTime != (time_t)-1) {
+        strftime(strTime, MAXTIMESTRING, "%c", localtime(&fileTime));
+        printf("Access Time: %s\n", strTime);
+    } else {
+        printf("Failed to get access time\n");
+    }
 }

@@ -16,3 +16,4 @@
 #define ERR_FULLDISK -16
 #define ERR_FILENAMELIMIT -17
 #define ERR_OUTOFBOUNDS -18
+#define ERR_TIMING -19
