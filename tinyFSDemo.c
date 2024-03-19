@@ -86,9 +86,28 @@ int main() {
   } else {
     /* if yes, then just read and print the rest of afile that was already there */
     printf("\n*** reading afile from TinyFS:\n%c\n", readBuffer);  /* print the first byte already read */
+    /* set afile to read only */
+    printf("setting afile to readonly\n");
+    if (tfs_makeRO("afile") < 0) {
+        perror("tfs_makeRO failed");
+    }
     /* write a new byte */
-    printf("\nwriting byte: 9\n\n");
-    tfs_writeByte(aFD, 57);
+    printf("\nwriting byte: 9\n");
+    if (tfs_writeByte(aFD, 57) < 0) {
+        printf("error correctly\n");
+    } else {
+        printf("succeeded incorrectly\n");
+    }
+    /* set afile to read write */
+    printf("changing back to read write and writing byte: 9\n");
+    if (tfs_makeRW("afile") < 0) {
+        perror("tfs_makeRW failed");
+    }
+    if (tfs_writeByte(aFD, 57) < 0) {
+        printf("error incorrectly\n");
+    } else {
+        printf("succeeded correctly\n");
+    }
     /* move the pointer back */
     tfs_seek(aFD, 1);
     /* now print the rest of it, byte by byte */

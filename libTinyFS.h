@@ -38,6 +38,8 @@ extern int tfs_writeByte(fileDescriptor FD, unsigned int data);
 extern int tfs_seek(fileDescriptor FD, int offset);
 extern void tfs_displayFragments();
 extern int tfs_defrag();
+extern int tfs_makeRO(char *name);
+extern int tfs_makeRW(char *name);
 extern time_t tfs_getCreationTime(fileDescriptor FD);
 extern time_t getFileAccessTime(fileDescriptor FD);
 extern time_t getFileModificationTime(fileDescriptor FD);

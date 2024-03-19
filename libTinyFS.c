@@ -395,7 +395,10 @@ fileDescriptor tfs_openFile(char *name) {
             if (strcmp(fname, name) == 0) {
                 fileExists = 1;
                 startBlock = i;
+                free(fname);
                 break;
+            } else {
+                free(fname);
             }
         }
     }
@@ -413,6 +416,25 @@ fileDescriptor tfs_openFile(char *name) {
     file->filePointer = 0;
     file->rw = 1;
 
+    // If the file exists, retrieve the time info
+    if (fileExists) {
+        i = 4;
+        // Go past name
+        while (curBlock[i]) i++;
+        i++;
+        // Go past size
+        if (!curBlock[i]) {
+            i++;
+        } else {
+            while (curBlock[i]) i++;
+        }
+        i++;
+        // Creation time
+
+    }
+    // Update access time
+
+
     // Add file to resource table
     resourceTable[resourceTablePointer] = file;
 
@@ -425,6 +447,17 @@ fileDescriptor tfs_openFile(char *name) {
 
     // If the file doesn't exist, we need to create an inode block for it in the disk
     if (!fileExists) {
+        // Update the file's time info
+        time_t curTime;
+        char curTimeStr[20] = {0};
+        if (time(&curTime) == -1) {
+            return ERR_TIMING;
+        }
+        sprintf(curTimeStr, "%ld", curTime);
+        file->creationTime = curTime;
+        file->accessTime = curTime;
+        file->modificationTime = curTime;
+
         // Get next free block
         status = fbc_get(1, buffer);
         if (status < 0) {
@@ -434,7 +467,7 @@ fileDescriptor tfs_openFile(char *name) {
 
         // Add inode block to disk
         char inodeBlock[BLOCKSIZE];
-        // Write name and size to inode block
+        // Write name to inode block
         char inodeData[DATASIZE];
         for (i = 0; name[i] != 0; i++) {
             inodeData[i] = name[i];
@@ -444,7 +477,18 @@ fileDescriptor tfs_openFile(char *name) {
             return ERR_FILENAMELIMIT;
         }
         inodeData[i++] = 0;
-        inodeData[i] = 0;
+        // Write size to inode block
+        inodeData[i++] = 0;
+        inodeData[i++] = 0;
+        // Write times to inodeBlock;
+        int k;
+        for (j = 0; j < 3; j++) {
+            k = 0;
+            while (curTimeStr[k]) {
+                inodeData[i++] = curTimeStr[k++];
+            }
+            inodeData[i++] = 0;
+        }
 
         // Create the inode block and write it to the disk
         create_block(inodeBlock, INODE, 0, inodeData, ++i);
@@ -603,9 +647,10 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
         writeBlock(curDisk, freeBlocks[i], curBlock);
     }
 
-    if(updateModificationTime(FD) != 0) {
+    // Update file's last modified time
+    if (updateModificationTime(FD)) {
         return ERR_TIMING;
-    } // updating file's last type modified
+    }
 
     // Finished successfully
     return 0;
@@ -709,9 +754,10 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
     // Increment file pointer
     resourceTable[idx]->filePointer++;
 
+    // Update file's last access time
     if(updateAccessTime(FD) != 0) {
         return ERR_TIMING;
-    } // updating file's last type modified
+    }
 
     // Finished successfully
     return 0;
@@ -783,9 +829,10 @@ int tfs_writeByte(fileDescriptor FD, unsigned int data) {
     // Increment file pointer
     resourceTable[idx]->filePointer++;
 
-    if(updateAccessTime(FD) != 0) {
+    // Update file's last modified time
+    if(updateModificationTime(FD) != 0) {
         return ERR_TIMING;
-    } // updating file's last type modified
+    }
 
     // Finished successfully
     return 0;
@@ -816,6 +863,11 @@ int tfs_seek(fileDescriptor FD, int offset) {
 
     // Change the file pointer location
     resourceTable[idx]->filePointer = offset;
+
+    // Update file's last modified time
+    if (updateModificationTime(FD) != 0) {
+        return ERR_TIMING;
+    }
 
     // Finished successfully
     return 0;
@@ -907,6 +959,7 @@ int tfs_makeRO(char *name) {
             if (!strcmp(resourceTable[i]->name, name)) {
                 // Set the bit to readonly
                 resourceTable[i]->rw = 0;
+                return 0;
             }
         }
     }
@@ -929,6 +982,7 @@ int tfs_makeRW(char *name) {
             if (!strcmp(resourceTable[i]->name, name)) {
                 // Set the bit to readwrite
                 resourceTable[i]->rw = 1;
+                return 0;
             }
         }
     }
@@ -942,10 +996,10 @@ time_t tfs_getCreationTime(fileDescriptor FD)  {
     // Get the resource table index of the open file
     int idx = get_file_idx(FD);
     if (idx < 0) {
-        return (time_t)-1; //error time
+        return (time_t) - 1; //error time
     }
     if(updateAccessTime(FD) != 0) {
-        return (time_t)-1; //error time
+        return (time_t) - 1; //error time
     } /* technically we are also accessing FD so... update it */
     return resourceTable[idx]->creationTime;
 }
@@ -954,10 +1008,10 @@ time_t tfs_getCreationTime(fileDescriptor FD)  {
 time_t getFileAccessTime(fileDescriptor FD) {
     int idx = get_file_idx(FD);
     if (idx < 0) {
-        return (time_t)-1; //error time
+        return (time_t) - 1; //error time
     }
     if(updateAccessTime(FD) != 0) {
-        return (time_t)-1; //error time
+        return (time_t) - 1; //error time
     } /* technically we are also accessing FD so... update it */
     return resourceTable[idx]->accessTime;
 }
@@ -966,10 +1020,10 @@ time_t getFileAccessTime(fileDescriptor FD) {
 time_t getFileModificationTime(fileDescriptor FD) {
     int idx = get_file_idx(FD);
     if (idx < 0) {
-        return (time_t)-1; //error time
+        return (time_t) - 1; //error time
     }
-    if(updateAccessTime(FD)!= 0) {
-        return (time_t)-1;
+    if (updateAccessTime(FD)!= 0) {
+        return (time_t) - 1;
     }  /* technically we are also accessing FD so... update it */
     return resourceTable[idx]->modificationTime;
 }
@@ -980,7 +1034,7 @@ int updateModificationTime(fileDescriptor FD) {
     if (idx < 0) {
         return idx;
     }
-    if(updateAccessTime(FD) != 0) {
+    if (updateAccessTime(FD) != 0) {
         return -1; //error time
     }  /* technically we are also accessing FD so... update it */
     time(&(resourceTable[idx]->modificationTime));
