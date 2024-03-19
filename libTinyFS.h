@@ -30,3 +30,4 @@ extern int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
 extern int tfs_deleteFile(fileDescriptor FD);
 extern int tfs_readByte(fileDescriptor FD, char *buffer);
 extern int tfs_seek(fileDescriptor FD, int offset);
+extern void tfs_displayFragments();

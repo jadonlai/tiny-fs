@@ -10,6 +10,7 @@
 int curDisk = -1;
 FileDetails *resourceTable[NUM_BLOCKS - 1] = {NULL};
 int resourceTablePointer = 0;
+char *typeMap[4] = {"superblock", "inode", "file extent", "free block"};
 
 
 
@@ -23,7 +24,7 @@ void print_disk(int diskNum, int numBlocks, int dataSize) {
             perror("print_disk");
             exit(1);
         }
-        printf("num: %d, type: %d, link: %d\n", i, block[0], block[2]);
+        printf("num: %2d   |   type: %11s   |   link: %2d\n", i, typeMap[(int) block[0] - 1], block[2]);
         if (dataSize) {
             for (j = 0; j < dataSize; j++) {
                 printf("%d ", block[j]);
@@ -611,8 +612,8 @@ int tfs_deleteFile(fileDescriptor FD) {
 
     // Get every data block
     while (curBlock[2]) {
-        status = readBlock(curDisk, curBlock[2], curBlock);
         fileBlocks[i++] = curBlock[2];
+        status = readBlock(curDisk, curBlock[2], curBlock);
     }
 
     // Free file's blocks
@@ -706,6 +707,18 @@ int tfs_seek(fileDescriptor FD, int offset) {
     // Change the file pointer location
     resourceTable[idx]->filePointer = offset;
 
+    // Finished successfully
+    return 0;
+}
+
+// Display a map of the free and occupied blocks in the disk
+void tfs_displayFragments() {
+    print_disk(curDisk, 40, 0);
+}
+
+// Move all the blocks so that the free blocks are continuous at the end of the disk
+// Return 0 on success or error code on failure
+int tfs_defrag() {
     // Finished successfully
     return 0;
 }
