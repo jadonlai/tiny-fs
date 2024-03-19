@@ -39,7 +39,7 @@ void print_rt() {
     printf("\nRESOURCE TABLE\n-------------------------\n");
     for (i = 0; i < NUM_BLOCKS - 1; i++) {
         if (resourceTable[i] != NULL) {
-            printf("file descriptor: %d, name: %s, block num: %d\n", resourceTable[i]->fd, resourceTable[i]->name, resourceTable[i]->blockNum);
+            printf("file descriptor: %d, name: %s, block num: %d\n", resourceTable[i]->fd, resourceTable[i]->name, resourceTable[i]->inode);
         }
     }
     printf("-------------------------\n\n");
@@ -212,7 +212,7 @@ int get_file_idx(fileDescriptor fd) {
 int get_fileSize(int idx) {
     // Read inode block
     char block[BLOCKSIZE];
-    int status = readBlock(curDisk, resourceTable[idx]->blockNum, block);
+    int status = readBlock(curDisk, resourceTable[idx]->inode, block);
     if (status < 0) {
         return status;
     }
@@ -390,11 +390,10 @@ fileDescriptor tfs_openFile(char *name) {
 
     // Create resource table entry
     FileDetails *file = malloc(sizeof(FileDetails));
-    file->inode = resourceTablePointer;
+    file->inode = startBlock;
     file->name = name;
-    file->fd = file->inode;
+    file->fd = resourceTablePointer;
     file->filePointer = 0;
-    file->blockNum = startBlock;
 
     // Add file to resource table
     resourceTable[resourceTablePointer] = file;
@@ -438,7 +437,7 @@ fileDescriptor tfs_openFile(char *name) {
         }
 
         // Set the file's block number in the resource table
-        file->blockNum = buffer[0];
+        file->inode = buffer[0];
     }
 
     // Return file descriptor
@@ -495,7 +494,7 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     resourceTable[idx]->filePointer = 0;
 
     // Get the file's inode block and initialize the current block
-    int status = readBlock(curDisk, resourceTable[idx]->blockNum, inodeBlock);
+    int status = readBlock(curDisk, resourceTable[idx]->inode, inodeBlock);
     if (status < 0) {
         return status;
     }
@@ -534,7 +533,7 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     fbc_set(curDisk, i, curDataBlocks);
 
     // Write the new inode block
-    status = writeBlock(curDisk, resourceTable[idx]->blockNum, inodeBlock);
+    status = writeBlock(curDisk, resourceTable[idx]->inode, inodeBlock);
     if (status < 0) {
         return status;
     }
@@ -602,10 +601,10 @@ int tfs_deleteFile(fileDescriptor FD) {
     }
 
     // Add the inode block to the file blocks list
-    fileBlocks[i++] = resourceTable[idx]->blockNum;
+    fileBlocks[i++] = resourceTable[idx]->inode;
 
     // Get the inode block
-    int status = readBlock(curDisk, resourceTable[idx]->blockNum, curBlock);
+    int status = readBlock(curDisk, resourceTable[idx]->inode, curBlock);
     if (status < 0) {
         return status;
     }
@@ -640,7 +639,7 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
 
     // Read inode block
     char block[BLOCKSIZE];
-    int status = readBlock(curDisk, resourceTable[idx]->blockNum, block);
+    int status = readBlock(curDisk, resourceTable[idx]->inode, block);
     if (status < 0) {
         return status;
     }
