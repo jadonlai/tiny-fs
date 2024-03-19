@@ -411,6 +411,7 @@ fileDescriptor tfs_openFile(char *name) {
     file->name = name;
     file->fd = resourceTablePointer;
     file->filePointer = 0;
+    file->rw = 1;
 
     // Add file to resource table
     resourceTable[resourceTablePointer] = file;
@@ -507,6 +508,12 @@ int tfs_writeFile(fileDescriptor FD, char *buffer, int size) {
     if (idx < 0) {
         return idx;
     }
+
+    // Check that we have write permissions
+    if (!resourceTable[idx]->rw) {
+        return ERR_READONLY;
+    }
+
     // Set the file pointer to 0
     resourceTable[idx]->filePointer = 0;
 
@@ -621,6 +628,11 @@ int tfs_deleteFile(fileDescriptor FD) {
         return idx;
     }
 
+    // Check that we have write permissions
+    if (!resourceTable[idx]->rw) {
+        return ERR_READONLY;
+    }
+
     // Add the inode block to the file blocks list
     fileBlocks[i++] = resourceTable[idx]->inode;
 
@@ -693,6 +705,80 @@ int tfs_readByte(fileDescriptor FD, char *buffer) {
 
     // Read byte based on offset
     *buffer = block[4 + offset];
+
+    // Increment file pointer
+    resourceTable[idx]->filePointer++;
+
+    if(updateAccessTime(FD) != 0) {
+        return ERR_TIMING;
+    } // updating file's last type modified
+
+    // Finished successfully
+    return 0;
+}
+
+// Write a byte into a file at its pointer and increment the pointer
+// Return 0 on success or error code on failure
+int tfs_writeByte(fileDescriptor FD, unsigned int data) {
+        // Init variables
+    int i;
+
+    // PRINT TESTING
+    // printf("tfs_readByte\n");
+
+    // Get the resource table index of the open file
+    int idx = get_file_idx(FD);
+    if (idx < 0) {
+        return idx;
+    }
+
+    // Check that we have write permissions
+    if (!resourceTable[idx]->rw) {
+        return ERR_READONLY;
+    }
+
+    // Read inode block
+    char block[BLOCKSIZE];
+    int status = readBlock(curDisk, resourceTable[idx]->inode, block);
+    if (status < 0) {
+        return status;
+    }
+
+    // Get the size of the data
+    int size = get_fileSize(idx);
+    if (size < 0) {
+        return size;
+    }
+
+    // Check that file pointer is within range
+    if (resourceTable[idx]->filePointer > size || resourceTable[idx]->filePointer < 0) {
+        return ERR_RSEEKISSUE;
+    }
+
+    // Set the block number and offset
+    int diskBlock = 0;
+    int blockNum = floor(resourceTable[idx]->filePointer / DATASIZE);
+    int offset = resourceTable[idx]->filePointer % DATASIZE;
+
+    // Get to the right block
+    for (i = 0; i < blockNum + 1; i++) {
+        diskBlock = block[2];
+        status = readBlock(curDisk, block[2], block);
+        if (status < 0) {
+            return status;
+        }
+        if (block[0] != FILEEXTENT) {
+            return ERR_BLOCKFORMAT;
+        }
+    }
+
+    // Write byte based on offset
+    block[4 + offset] = data;
+    // Write block back to the disk
+    status = writeBlock(curDisk, diskBlock, block);
+    if (status < 0) {
+        return status;
+    }
 
     // Increment file pointer
     resourceTable[idx]->filePointer++;
@@ -805,6 +891,50 @@ int tfs_defrag() {
 
     // Finished successfully
     return 0;
+}
+
+// Given a filename, make it readonly
+// Return 0 on success or error code on failure
+int tfs_makeRO(char *name) {
+    // Init variables
+    int i;
+    
+    // Find the file
+    for (i = 0; i < NUM_BLOCKS - 1; i++) {
+        // Entry exists
+        if (resourceTable[i]) {
+            // Correct file
+            if (!strcmp(resourceTable[i]->name, name)) {
+                // Set the bit to readonly
+                resourceTable[i]->rw = 0;
+            }
+        }
+    }
+
+    // Couldn't find file
+    return ERR_NOFILE;
+}
+
+// Given a filename, make it readwrite
+// Return 0 on success or error code on failure
+int tfs_makeRW(char *name) {
+    // Init variables
+    int i;
+    
+    // Find the file
+    for (i = 0; i < NUM_BLOCKS - 1; i++) {
+        // Entry exists
+        if (resourceTable[i]) {
+            // Correct file
+            if (!strcmp(resourceTable[i]->name, name)) {
+                // Set the bit to readwrite
+                resourceTable[i]->rw = 1;
+            }
+        }
+    }
+
+    // Couldn't find file
+    return ERR_NOFILE;
 }
 
 /* get creation time of file */

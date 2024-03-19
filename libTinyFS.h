@@ -20,6 +20,7 @@ typedef struct FileDetails {
     char *name;
     fileDescriptor fd;
     int filePointer;
+    int rw;
     time_t creationTime; 
     time_t accessTime; 
     time_t modificationTime;
@@ -33,6 +34,7 @@ extern int tfs_closeFile(fileDescriptor FD);
 extern int tfs_writeFile(fileDescriptor FD, char *buffer, int size);
 extern int tfs_deleteFile(fileDescriptor FD);
 extern int tfs_readByte(fileDescriptor FD, char *buffer);
+extern int tfs_writeByte(fileDescriptor FD, unsigned int data);
 extern int tfs_seek(fileDescriptor FD, int offset);
 extern void tfs_displayFragments();
 extern int tfs_defrag();
