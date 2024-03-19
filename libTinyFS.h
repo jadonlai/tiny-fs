@@ -23,7 +23,7 @@ typedef struct FileDetails {
     int blockNum;
     time_t creationTime; 
     time_t accessTime; 
-    time_t modificationTime; 
+    time_t modificationTime;
 } FileDetails;
 
 extern int tfs_mkfs(char *filename, int nBytes);
