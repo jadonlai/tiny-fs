@@ -98,6 +98,8 @@ int main() {
 	    aFD = tfs_openFile("afile"); /* so we open it again */
 	    if (tfs_deleteFile (aFD) < 0)
 	      perror("tfs_deleteFile failed");
+        else
+          printf("\n\ntfs_deleteFile succeeded\n");
 	  } else {
 	    perror("tfs_deleteFile should have failed");
     }
@@ -114,16 +116,23 @@ int main() {
     if (tfs_writeFile(bFD, bfileContent, bfileSize) < 0) {
 	    perror("tfs_writeFile failed");
 	  } else {
-	    printf("\nSuccessfully written to bfile\n");
+	    printf("\nSuccessfully written to bfile");
     }
   } else {
     printf("\n*** reading bfile from TinyFS:\n%c", readBuffer);
     while (tfs_readByte(bFD, &readBuffer) >= 0)
 	    printf("%c", readBuffer);
-    tfs_deleteFile(bFD);
   }
 
+  /* print the fragments before we fix them */
+  printf("\n\ndisk with fragmentation\n");
+  tfs_displayFragments();
+
+  /* defragment the disk */
+  tfs_defrag();
+
   /* print the fragments */
+  printf("disk with fixed fragmentation\n");
   tfs_displayFragments();
 
   /* Free both content buffers */
