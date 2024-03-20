@@ -12,7 +12,9 @@
 #define WRITE 2
 #define READWRITE 3
 #define NUM_BLOCKS 40
-#define MAXNAMECHARS 8
+#define NAMELENGTH 9
+#define TIMELENGTH 11
+#define SIZELENGTH 6
 #define MAXTIMESTRING 26
 
 typedef struct FileDetails {
@@ -21,10 +23,20 @@ typedef struct FileDetails {
     fileDescriptor fd;
     int filePointer;
     int rw;
-    time_t creationTime; 
-    time_t accessTime; 
-    time_t modificationTime;
 } FileDetails;
+
+/* Inode Block:
+ * 0: Block Type
+ * 1: 0x44
+ * 2: Link
+ * 3: Empty
+ * 4-12: Name
+ * 13-18: Size
+ * 19-29: Creation Time
+ * 30-40: Modification Time
+ * 41-51: Access Time
+ * 
+ * Note: The name, size, creation, modification, and access time end in null bytes */
 
 extern int tfs_mkfs(char *filename, int nBytes);
 extern int tfs_mount(char *diskname);
@@ -38,10 +50,8 @@ extern int tfs_writeByte(fileDescriptor FD, unsigned int data);
 extern int tfs_seek(fileDescriptor FD, int offset);
 extern void tfs_displayFragments();
 extern int tfs_defrag();
-extern time_t tfs_getCreationTime(fileDescriptor FD);
-extern time_t getFileAccessTime(fileDescriptor FD);
-extern time_t getFileModificationTime(fileDescriptor FD);
-extern int updateModificationTime(fileDescriptor FD);
-extern int updateAccessTime(fileDescriptor FD);
-void printTimes(fileDescriptor FD);
-
+extern int tfs_makeRO(char *name);
+extern int tfs_makeRW(char *name);
+extern int tfs_rename(fileDescriptor FD, char *newName);
+extern int tfs_readdir();
+extern int tfs_readFileInfo(fileDescriptor FD);
