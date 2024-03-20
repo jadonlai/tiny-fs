@@ -5,25 +5,6 @@
 Disk *head = NULL;
 int diskCount = 0;
 
-/* THIS SHOULD BE DELETED */
-void printDiskList(Disk *head) {
-    Disk *current = head;
-
-    printf("Disk List:\n");
-    printf("----------------------------------------------------------------\n");
-    printf("| Disk Number | Disk Size | Status | Filename       | File Pointer |\n");
-    printf("----------------------------------------------------------------\n");
-
-    while (current != NULL) {
-        printf("| %-12d| %-10d| %-7d| %-15s| %-13p|\n", 
-               current->diskNumber, current->diskSize, current->status, 
-               current->fileName, current->file);
-        current = current->next;
-    }
-
-    printf("----------------------------------------------------------------\n");
-}
-
 /* opens regular UNIX File */
 int openDisk(char *filename, int nBytes) {
     FILE* file;
