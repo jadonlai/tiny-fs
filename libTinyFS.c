@@ -929,6 +929,9 @@ int tfs_rename(fileDescriptor FD, char *newName) {
     status = writeBlock(curDisk, resourceTable[idx]->inode, block);
     if (status < 0) return status;
 
+    // Change the name in the resource table
+    resourceTable[idx]->name = newName;
+
     // Finished successfully
     return 0;
 }
