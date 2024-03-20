@@ -24,4 +24,3 @@ To list the root directory, we iterate through the entire disk, and every time w
 
 ○ Any limitations or bugs your file system has.
 We do not have any limitations or bugs in our file system. It is looking good. 
-
