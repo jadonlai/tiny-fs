@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "tinyFS.h"
 #include "libTinyFS.h"
@@ -63,7 +64,7 @@ int main() {
   }
 
   /* print content of files for debugging */
-  printf("(a) File content: %s\n\n(b) File content: %s\n\nReady to store in TinyFS\n", afileContent, bfileContent);
+  printf("(a) File content: %s\n(b) File content: %s\nReady to store in TinyFS\n", afileContent, bfileContent);
 
   /* read or write files to TinyFS */
   aFD = tfs_openFile("afile");
@@ -71,6 +72,12 @@ int main() {
   if (aFD < 0) {
     perror("tfs_openFile failed on afile");
   }
+
+  printf("afile post creating\n");
+  if (tfs_readFileInfo(aFD) < 0) {
+    perror("tfs_readFileInfo failed");
+  }
+  sleep(3);
 
   /* now, was there already a file named "afile" that had some content? If we can read from it, yes!
    * If we can't read from it, it presumably means the file was empty.
@@ -81,18 +88,22 @@ int main() {
     if (tfs_writeFile(aFD, afileContent, afileSize) < 0) {
 	    perror("tfs_writeFile failed");
 	  } else {
-	    printf("\nSuccessfully written to afile\n");
+        printf("afile post writing\n");
+        if (tfs_readFileInfo(aFD) < 0) {
+          perror("tfs_readFileInfo failed");
+        }
+	    printf("Successfully written to afile\n");
     }
   } else {
     /* if yes, then just read and print the rest of afile that was already there */
-    printf("\n*** reading afile from TinyFS:\n%c\n", readBuffer);  /* print the first byte already read */
+    printf("*** reading afile from TinyFS:\n%c\n", readBuffer);  /* print the first byte already read */
     /* set afile to read only */
     printf("setting afile to readonly\n");
     if (tfs_makeRO("afile") < 0) {
         perror("tfs_makeRO failed");
     }
     /* write a new byte */
-    printf("\nwriting byte: 9\n");
+    printf("writing byte: 9\n");
     if (tfs_writeByte(aFD, 57) < 0) {
         printf("error correctly\n");
     } else {
@@ -114,6 +125,10 @@ int main() {
     printf("reading again:\n");
     while (tfs_readByte(aFD, &readBuffer) >= 0)  /* go until readByte fails */
 	    printf("%c", readBuffer);
+    printf("\nafile post reading\n");
+    if (tfs_readFileInfo(aFD) < 0) {
+      perror("tfs_readFileInfo failed");
+    }
     /* close file */
     if (tfs_closeFile (aFD) < 0)
 	    perror("tfs_closeFile failed");
@@ -124,7 +139,7 @@ int main() {
 	    if (tfs_deleteFile (aFD) < 0)
 	      perror("tfs_deleteFile failed");
         else
-          printf("\n\ntfs_deleteFile succeeded\n");
+          printf("tfs_deleteFile succeeded\n");
 	  } else {
 	    perror("tfs_deleteFile should have failed");
     }
@@ -132,29 +147,43 @@ int main() {
 
   /* now bfile tests */
   bFD = tfs_openFile("bfile");
+  sleep(3);
 
   if (bFD < 0) {
-    perror ("tfs_openFile failed on bfile");
+    perror("tfs_openFile failed on bfile");
+  }
+
+  printf("bfile just opened\n");
+  if (tfs_readFileInfo(bFD) < 0) {
+    perror("tfs_readFileInfo failed");
   }
 
   if (tfs_readByte(bFD, &readBuffer) < 0) {
     if (tfs_writeFile(bFD, bfileContent, bfileSize) < 0) {
 	    perror("tfs_writeFile failed");
 	  } else {
-	    printf("\nSuccessfully written to bfile");
+        printf("bfile post writing\n");
+        if (tfs_readFileInfo(aFD) < 0) {
+          perror("tfs_readFileInfo failed");
+        }
+	    printf("Successfully written to bfile\n");
     }
   } else {
-    printf("\n*** reading bfile from TinyFS:\n%c", readBuffer);
-    printf("\nwriting byte: 9\n\n");
+    printf("*** reading bfile from TinyFS:\n%c", readBuffer);
+    printf("\nwriting byte: 9\n");
     tfs_writeByte(bFD, 57);
     tfs_seek(bFD, 1);
     printf("reading again:\n");
     while (tfs_readByte(bFD, &readBuffer) >= 0)
 	    printf("%c", readBuffer);
+    printf("\nbfile post reading\n");
+    if (tfs_readFileInfo(bFD) < 0) {
+      perror("tfs_readFileInfo failed");
+    }
   }
 
   /* print the fragments before we fix them */
-  printf("\n\ndisk with fragmentation\n");
+  printf("disk with fragmentation\n");
   tfs_displayFragments();
 
   /* defragment the disk */
