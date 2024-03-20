@@ -904,6 +904,63 @@ int tfs_makeRW(char *name) {
     return ERR_NOFILE;
 }
 
+// Given a file descriptor and new name, set the name of the file to that new name
+// Return 0 on success or error code on failure
+int tfs_rename(fileDescriptor FD, char *newName) {
+    // Get the resource table index of the open file
+    int idx = get_file_idx(FD);
+    if (idx < 0) return idx;
+
+    // Check that we have write permissions
+    if (!resourceTable[idx]->rw) return ERR_READONLY;
+
+    // Check that the name is has the correct length
+    if (strlen(newName) > 8) return ERR_FILENAMELIMIT;
+
+    // Read the inode block
+    char block[BLOCKSIZE] = {0};
+    int status = readBlock(curDisk, resourceTable[idx]->inode, block);
+    if (status < 0) return status;
+
+    // Write the name to the block
+    memcpy(block + 4, newName, NAMELENGTH);
+
+    // Write the block to the disk
+    status = writeBlock(curDisk, resourceTable[idx]->inode, block);
+    if (status < 0) return status;
+
+    // Finished successfully
+    return 0;
+}
+
+// Print out every file in the disk
+// Return 0 on success or error code on failure
+int tfs_readdir() {
+    // Init variables
+    int i, status;
+
+    // Print header
+    printf("\nFILES\n");
+    printf("-------------------------\n");
+    
+    // Iterate through every block
+    char block[BLOCKSIZE] = {0};
+    for (i = 1; i < NUM_BLOCKS - 1; i++) {
+        // Read the block
+        status = readBlock(curDisk, i, block);
+        if (status < 0) return status;
+
+        // Check if an inode block
+        if (block[0] == INODE) {
+            printf("%s\n", block + 4);
+        }
+    }
+    printf("\n");
+
+    // Finished successfully
+    return 0;
+}
+
 // Given a file descriptor, print out the data of that file
 // Return 0 on success or error code on failure
 int tfs_readFileInfo(fileDescriptor FD) {

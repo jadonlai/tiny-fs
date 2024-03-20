@@ -73,7 +73,7 @@ int main() {
     perror("tfs_openFile failed on afile");
   }
 
-  printf("afile post creating\n");
+  printf("afile post opening\n");
   if (tfs_readFileInfo(aFD) < 0) {
     perror("tfs_readFileInfo failed");
   }
@@ -145,6 +145,9 @@ int main() {
     }
   }
 
+  /* list the root directory */
+  tfs_readdir();
+
   /* now bfile tests */
   bFD = tfs_openFile("bfile");
   sleep(3);
@@ -163,7 +166,7 @@ int main() {
 	    perror("tfs_writeFile failed");
 	  } else {
         printf("bfile post writing\n");
-        if (tfs_readFileInfo(aFD) < 0) {
+        if (tfs_readFileInfo(bFD) < 0) {
           perror("tfs_readFileInfo failed");
         }
 	    printf("Successfully written to bfile\n");
@@ -181,6 +184,15 @@ int main() {
       perror("tfs_readFileInfo failed");
     }
   }
+
+  /* rename bfile */
+  printf("Renaming bfile to cfile\n");
+  if (tfs_rename(bFD, "cfile") < 0) {
+    perror("tfs_rename failed");
+  }
+
+  /* list the root directory */
+  tfs_readdir();
 
   /* print the fragments before we fix them */
   printf("disk with fragmentation\n");

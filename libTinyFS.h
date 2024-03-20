@@ -52,4 +52,6 @@ extern void tfs_displayFragments();
 extern int tfs_defrag();
 extern int tfs_makeRO(char *name);
 extern int tfs_makeRW(char *name);
+extern int tfs_rename(fileDescriptor FD, char *newName);
+extern int tfs_readdir();
 extern int tfs_readFileInfo(fileDescriptor FD);
